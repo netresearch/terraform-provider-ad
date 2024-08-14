@@ -37,3 +37,5 @@ website/vendor
 *.plan
 example/plan
 **/terraform.d
+
+/dist
