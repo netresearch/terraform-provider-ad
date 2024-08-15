@@ -219,6 +219,12 @@ func resourceADUser() *schema.Resource {
 				Default:     false,
 				Description: "If set to true, the user account is trusted for Kerberos delegation. A service that runs under an account that is trusted for Kerberos delegation can assume the identity of a client requesting the service. This parameter sets the TrustedForDelegation property of an account object.",
 			},
+			"username": {
+				Type:        schema.TypeString,
+				Optional:    true,
+				Default:     false,
+				Description: "Set a username for the user. This parameter is the equivalent to the -Name parameter of New-ADUser cmdlet.",
+			},
 			"custom_attributes": {
 				Type:             schema.TypeString,
 				Optional:         true,
@@ -342,6 +348,7 @@ func resourceADUserRead(d *schema.ResourceData, meta interface{}) error {
 	_ = d.Set("title", u.Title)
 	_ = d.Set("smart_card_logon_required", u.SmartcardLogonRequired)
 	_ = d.Set("trusted_for_delegation", u.TrustedForDelegation)
+	_ = d.Set("username", u.Username)
 
 	if u.CustomAttributes != nil {
 		ca, err := structure.FlattenJsonToString(u.CustomAttributes)

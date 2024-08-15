@@ -56,7 +56,7 @@ type User struct {
 	Password               string
 	Container              string
 	Domain                 string
-	Username               string
+	Username               string `json:"Name"`
 	PasswordNeverExpires   bool
 	CannotChangePassword   bool
 	CustomAttributes       map[string]interface{}
@@ -278,6 +278,7 @@ func (u *User) ModifyUser(d *schema.ResourceData, conf *config.ProviderConf) err
 		"street_address":   "StreetAddress",
 		"surname":          "Surname",
 		"title":            "Title",
+		"username":         "Username",
 	}
 
 	cmds := []string{fmt.Sprintf("Set-ADUser -Identity %q", u.GUID)}
@@ -540,10 +541,14 @@ func GetUserFromResource(d *schema.ResourceData) (*User, error) {
 		Surname:                SanitiseTFInput(d, "surname"),
 		Title:                  SanitiseTFInput(d, "title"),
 		TrustedForDelegation:   d.Get("trusted_for_delegation").(bool),
+		Username:               SanitiseTFInput(d, "username"),
 	}
 	if user.PrincipalName != "" {
 		tokens := strings.Split(user.PrincipalName, "@")
-		user.Username = tokens[0]
+		// set user.Username to the first token in the split if it user.Username is empty
+		if user.Username == "" {
+			user.Username = tokens[0]
+		}
 		if len(tokens) > 1 {
 			user.Domain = tokens[1]
 		}
@@ -608,7 +613,9 @@ func unmarshallUser(input []byte, customAttributes []string) (*User, error) {
 	}
 	if user.PrincipalName != "" {
 		tokens := strings.Split(user.PrincipalName, "@")
-		user.Username = tokens[0]
+		if user.Username == "" {
+			user.Username = tokens[0]
+    }
 		if len(tokens) > 1 {
 			user.Domain = tokens[1]
 		}
