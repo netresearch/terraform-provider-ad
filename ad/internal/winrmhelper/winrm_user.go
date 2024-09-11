@@ -615,7 +615,7 @@ func unmarshallUser(input []byte, customAttributes []string) (*User, error) {
 		tokens := strings.Split(user.PrincipalName, "@")
 		if user.Username == "" {
 			user.Username = tokens[0]
-    }
+		}
 		if len(tokens) > 1 {
 			user.Domain = tokens[1]
 		}
