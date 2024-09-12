@@ -185,6 +185,11 @@ func dataSourceADUser() *schema.Resource {
 				Computed:    true,
 				Description: "Check if user is trusted for delegation",
 			},
+			"username": {
+				Type:        schema.TypeString,
+				Computed:    true,
+				Description: "Username of the user object.",
+			},
 			"dn": {
 				Type:        schema.TypeString,
 				Computed:    true,
@@ -239,6 +244,7 @@ func dataSourceADUserRead(d *schema.ResourceData, meta interface{}) error {
 	_ = d.Set("title", u.Title)
 	_ = d.Set("smart_card_logon_required", u.SmartcardLogonRequired)
 	_ = d.Set("trusted_for_delegation", u.TrustedForDelegation)
+	_ = d.Set("username", u.Username)
 	_ = d.Set("user_id", userID)
 	d.SetId(u.GUID)
 

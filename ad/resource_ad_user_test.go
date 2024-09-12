@@ -306,6 +306,7 @@ func testAccResourceADUserConfigAttributes() string {
 	  street_address            = "StreetAddress"
 	  surname                   = "Surname"
 	  title                     = "Title"
+	  username                  = "Username"
 	  smart_card_logon_required = false
 	  trusted_for_delegation    = true
 	}`, defaultVariablesSection(), defaultUserSection("", fmt.Sprintf("%q",
