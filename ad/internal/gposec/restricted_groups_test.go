@@ -147,18 +147,18 @@ func TestRestrictedGroupsSetIniData(t *testing.T) {
 	section := iniFile.Section("Group Membership")
 	gm, err := section.GetKey(fmt.Sprintf("%s__Members", rv.Groups[0].GroupName))
 	if err != nil {
-		t.Errorf(fmt.Sprintf("key group1__Members wasn't found: %s", err))
+		t.Errorf("key group1__Members wasn't found: %s", err)
 	}
 	if gm != nil && gm.Value() != "group2" {
-		t.Errorf(fmt.Sprintf("unexpected value for group1__Members. expected group2 got %s", gm.Value()))
+		t.Errorf("unexpected value for group1__Members. expected group2 got %s", gm.Value())
 	}
 
 	gm, err = section.GetKey(fmt.Sprintf("%s__Memberof", rv.Groups[0].GroupName))
 	if err != nil {
-		t.Errorf(fmt.Sprintf("key group1__Memberof wasn't found: %s", err))
+		t.Errorf("key group1__Memberof wasn't found: %s", err)
 	}
 	if gm != nil && gm.Value() != "group3" {
-		t.Errorf(fmt.Sprintf("unexpected value for group1__Memberof. expected group2 got %s", gm.Value()))
+		t.Errorf("unexpected value for group1__Memberof. expected group2 got %s", gm.Value())
 	}
 
 	iniFile = ini.Empty(loadOpts)
