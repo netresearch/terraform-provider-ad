@@ -229,7 +229,7 @@ func (u *User) NewUser(conf *config.ProviderConf) (string, error) {
 		return "", err
 	}
 	if result.ExitCode != 0 {
-		log.Printf("[DEBUG] stderr: %s\nstdout: %s", result.StdErr, result.Stdout)
+		// Logging already handled in Run() method with redaction
 		if strings.Contains(result.StdErr, "AlreadyExists") {
 			return "", fmt.Errorf("there is another User named %q", u.PrincipalName)
 		}
@@ -402,7 +402,7 @@ func (u *User) ModifyUser(d *schema.ResourceData, conf *config.ProviderConf) err
 			return err
 		}
 		if result.ExitCode != 0 {
-			log.Printf("[DEBUG] stderr: %s\nstdout: %s", result.StdErr, result.Stdout)
+			// Logging already handled in Run() method with redaction
 			return fmt.Errorf("command Set-ADUser exited with a non-zero exit code %d, stderr: %s", result.ExitCode, result.StdErr)
 		}
 	}
@@ -424,7 +424,7 @@ func (u *User) ModifyUser(d *schema.ResourceData, conf *config.ProviderConf) err
 			return err
 		}
 		if result.ExitCode != 0 {
-			log.Printf("[DEBUG] stderr: %s\nstdout: %s", result.StdErr, result.Stdout)
+			// Logging already handled in Run() method with redaction
 			return fmt.Errorf("command Set-AccountPassword exited with a non-zero exit code %d, stderr: %s", result.ExitCode, result.StdErr)
 		}
 	}
@@ -587,7 +587,7 @@ func GetUserFromHost(conf *config.ProviderConf, guid string, customAttributes []
 	}
 
 	if result.ExitCode != 0 {
-		log.Printf("[DEBUG] stderr: %s\nstdout: %s", result.StdErr, result.Stdout)
+		// Logging already handled in Run() method with redaction
 		return nil, fmt.Errorf("command Get-ADUser exited with a non-zero exit code %d, stderr: %s", result.ExitCode, result.StdErr)
 	}
 

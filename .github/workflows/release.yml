@@ -7,12 +7,14 @@ on:
       - "v*"
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   release:
     runs-on: ubuntu-latest
     name: Release Provider
+    permissions:
+      contents: write
     steps:
       - id: go-version
         run: echo "::set-output name=version::$(cat ./.go-version)"
