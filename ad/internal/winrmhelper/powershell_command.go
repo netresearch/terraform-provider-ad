@@ -4,6 +4,7 @@ import (
 	"encoding/xml"
 	"fmt"
 	"log"
+	"regexp"
 	"strings"
 
 	"github.com/hashicorp/terraform-provider-ad/ad/internal/config"
@@ -68,10 +69,7 @@ func NewPSCommand(cmds []string, opts CreatePSCommandOpts) *PSCommand {
 
 	cmd := strings.Join(cmds, " ")
 
-	logStr := cmd
-	if opts.PassCredentials {
-		logStr = strings.ReplaceAll(cmd, opts.Password, "<REDACTED>")
-	}
+	logStr := redactSensitiveData(cmd, opts.Password)
 	log.Printf("[DEBUG] Constructing powerrshell command: %s ", logStr)
 
 	res := PSCommand{
@@ -80,6 +78,36 @@ func NewPSCommand(cmds []string, opts CreatePSCommandOpts) *PSCommand {
 	}
 
 	return &res
+}
+
+// redactSensitiveData redacts passwords and other sensitive data from log output
+func redactSensitiveData(cmd string, winrmPassword string) string {
+	logStr := cmd
+
+	// Redact WinRM password if PassCredentials is enabled
+	if winrmPassword != "" {
+		logStr = strings.ReplaceAll(logStr, winrmPassword, "<REDACTED>")
+	}
+
+	// Redact passwords in -AccountPassword parameter using regex
+	// Matches: -AccountPassword (ConvertTo-SecureString -AsPlainText "password" -Force)
+	accountPasswordRegex := regexp.MustCompile(`-AccountPassword\s+\(ConvertTo-SecureString\s+-AsPlainText\s+"[^"]*"\s+-Force\)`)
+	logStr = accountPasswordRegex.ReplaceAllString(logStr, "-AccountPassword (ConvertTo-SecureString -AsPlainText \"<REDACTED>\" -Force)")
+
+	// Also handle single-quoted passwords
+	accountPasswordRegexSingleQuote := regexp.MustCompile(`-AccountPassword\s+\(ConvertTo-SecureString\s+-AsPlainText\s+'[^']*'\s+-Force\)`)
+	logStr = accountPasswordRegexSingleQuote.ReplaceAllString(logStr, "-AccountPassword (ConvertTo-SecureString -AsPlainText '<REDACTED>' -Force)")
+
+	// Redact passwords in -NewPassword parameter (used by Set-ADAccountPassword)
+	// Matches: -NewPassword (ConvertTo-SecureString -AsPlainText "password" -Force)
+	newPasswordRegex := regexp.MustCompile(`-NewPassword\s+\(ConvertTo-SecureString\s+-AsPlainText\s+"[^"]*"\s+-Force\)`)
+	logStr = newPasswordRegex.ReplaceAllString(logStr, "-NewPassword (ConvertTo-SecureString -AsPlainText \"<REDACTED>\" -Force)")
+
+	// Also handle single-quoted passwords for NewPassword
+	newPasswordRegexSingleQuote := regexp.MustCompile(`-NewPassword\s+\(ConvertTo-SecureString\s+-AsPlainText\s+'[^']*'\s+-Force\)`)
+	logStr = newPasswordRegexSingleQuote.ReplaceAllString(logStr, "-NewPassword (ConvertTo-SecureString -AsPlainText '<REDACTED>' -Force)")
+
+	return logStr
 }
 
 // Run will run a powershell command and return the stdout and stderr
@@ -116,7 +144,10 @@ func (p *PSCommand) Run(conf *config.ProviderConf) (*PSCommandResult, error) {
 
 	log.Printf("[DEBUG] Powershell command exited with code %d", res)
 	if res != 0 {
-		log.Printf("[DEBUG] Stdout: %s, Stderr: %s", stdout, stderr)
+		// Redact sensitive data from stdout/stderr before logging
+		redactedStdout := redactSensitiveData(stdout, p.Password)
+		redactedStderr := redactSensitiveData(stderr, p.Password)
+		log.Printf("[DEBUG] Stdout: %s, Stderr: %s", redactedStdout, redactedStderr)
 	}
 
 	// Decode stderr here for the error to be human readable if we need to return early
