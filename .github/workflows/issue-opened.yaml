@@ -4,12 +4,18 @@ on:
   issues:
     types: [opened]
 
+permissions:
+  contents: read
+
 jobs:
   issue_triage:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
     steps:
-    - uses: actions/checkout@1e31de5234b9f8995739874a8ce0492dc87873e2 # v4.0.0
-    - uses: github/issue-labeler@98b5412841f6c4b0b3d9c29d53c13fad16bd7de2 # v3.2
+    - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+    - uses: github/issue-labeler@c1b0f9f52a63158c4adc09425e858e87b32e9685 # v3.4
       with:
         repo-token: "${{ secrets.GITHUB_TOKEN }}"
         configuration-path: .github/labeler-issue-triage.yml
