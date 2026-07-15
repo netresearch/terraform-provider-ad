@@ -15,8 +15,6 @@ What this fork changes on top of upstream:
 - **Unvendors the dependency tree** ([`419b522`](https://github.com/netresearch/terraform-provider-ad/commit/419b5226deda2c227074ca63e28dfbf72986ed72)) and keeps dependencies current, including security updates that upstream stopped receiving.
 - **Releases from our own pipeline** — upstream released through HashiCorp-internal infrastructure that a fork cannot use.
 
-Since upstream is archived, please [file issues here](https://github.com/netresearch/terraform-provider-ad/issues/new/choose) rather than against HashiCorp.
-
 [![Releases](https://img.shields.io/github/release/netresearch/terraform-provider-ad.svg)](https://github.com/netresearch/terraform-provider-ad/releases)
 [![LICENSE](https://img.shields.io/github/license/netresearch/terraform-provider-ad.svg)](https://github.com/netresearch/terraform-provider-ad/blob/main/LICENSE)
 ![Unit tests](https://github.com/netresearch/terraform-provider-ad/workflows/Unit%20tests/badge.svg)
