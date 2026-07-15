@@ -6,11 +6,21 @@ on:
       - main
     paths:
       - '**.go'
+      - 'go.mod'
+      - 'go.sum'
+      - '.go-version'
+      - 'GNUmakefile'
+      - '.github/workflows/unit_tests.yaml'
   pull_request:
     branches:
       - main
     paths:
       - '**.go'
+      - 'go.mod'
+      - 'go.sum'
+      - '.go-version'
+      - 'GNUmakefile'
+      - '.github/workflows/unit_tests.yaml'
 
 permissions:
   contents: read
