@@ -35,6 +35,10 @@ By using the software in this repository (the AD provider), you acknowledge that
 * [Windows Server](https://www.microsoft.com/en-us/windows-server) 2012R2 or greater
 * [Go](https://golang.org/doc/install) version 1.25.x+ (only to build from source; see `go.mod`)
 
+## Known issues
+
+* **`ad_user` destroy silently no-ops when `Remove-ADUser` is denied.** If the deletion is rejected by AD (for example on accounts protected from accidental deletion, or with insufficient permissions), the destroy step reports success and removes the resource from state while the user object still exists in AD. Until this is fixed (the exit-code check used by other mutators needs to be applied to the delete path), verify deletions out of band, e.g. `Get-ADUser` should raise `ADIdentityNotFoundException` afterwards.
+
 ## Getting Started
 
 If this is your first time here, you can get an overview of the provider by reading HashiCorp's [introductory blog post](https://www.hashicorp.com/blog/manage-active-directory-objects-new-windows-ad-provider-hashicorp-terraform). Otherwise, start by downloading a copy of the latest build from the [registry](https://registry.terraform.io/providers/netresearch/ad/latest).
