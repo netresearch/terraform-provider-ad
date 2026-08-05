@@ -63,7 +63,11 @@ func unmarshalGroupMembership(input []byte) ([]*GroupMember, error) {
 func getMembershipList(g []*GroupMember) string {
 	out := []string{}
 	for _, member := range g {
-		out = append(out, member.GUID)
+		// Quote each member: unquoted values containing spaces or commas
+		// (any DN of the form CN=First Last,OU=...) break PowerShell
+		// parameter binding of -Members ("System.Object[]" /
+		// PositionalParameterNotFound).
+		out = append(out, fmt.Sprintf("%q", member.GUID))
 	}
 
 	return strings.Join(out, ",")
