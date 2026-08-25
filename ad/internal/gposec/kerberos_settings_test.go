@@ -8,7 +8,7 @@ import (
 )
 
 func TestWriteKerberosSettings(t *testing.T) {
-	data := map[string]interface{}{
+	data := map[string]any{
 		"max_service_age": "10",
 	}
 

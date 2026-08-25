@@ -51,13 +51,13 @@ type SecuritySettings struct {
 // PopulateSecuritySettings populates the SecuritySettings struct from resource data
 func (s *SecuritySettings) PopulateSecuritySettings(d *schema.ResourceData, iniFile *ini.File) error {
 	for section, fn := range ListSectionGeneratorMap {
-		keyFunc := fn.(func(interface{}, *SecuritySettings) error)
-		l := d.Get(section).([]interface{})
+		keyFunc := fn.(func(any, *SecuritySettings) error)
+		l := d.Get(section).([]any)
 		if len(l) == 0 || l[0] == nil {
 			continue
 		}
 		// All TypeLists in the resource schema have MaxItems set to 1
-		data := l[0].(map[string]interface{})
+		data := l[0].(map[string]any)
 
 		err := keyFunc(data, s)
 		if err != nil {
@@ -71,7 +71,7 @@ func (s *SecuritySettings) PopulateSecuritySettings(d *schema.ResourceData, iniF
 	}
 
 	for section, fn := range SetSectionGeneratorMap {
-		keyFunc := fn.(func(interface{}) (IniSetSection, error))
+		keyFunc := fn.(func(any) (IniSetSection, error))
 
 		setSection, err := keyFunc(d.Get(section))
 		if err != nil {
@@ -157,7 +157,7 @@ func (s *SecuritySettings) GetSectionData(section string, d *schema.ResourceData
 
 // ListSectionGeneratorMap maps a schema name to a function that populates the corresponding
 // SecuritySettings fields with resource data.
-var ListSectionGeneratorMap = map[string]interface{}{
+var ListSectionGeneratorMap = map[string]any{
 	"password_policies": WritePasswordPolicies,
 	"account_lockout":   WriteAccountLockout,
 	"kerberos_policy":   WriteKerberosPolicy,
@@ -170,7 +170,7 @@ var ListSectionGeneratorMap = map[string]interface{}{
 // SetSectionGeneratorMap maps a schema name to a function that returns an INI section from resource data
 // The difference with the map above is that this one deals with schema elements that are Sets instead
 // of Lists and therefore require different handling.
-var SetSectionGeneratorMap = map[string]interface{}{
+var SetSectionGeneratorMap = map[string]any{
 	"restricted_groups": NewRestrictedGroupsFromResource,
 	"registry_values":   NewRegistryValuesFromResource,
 	"system_services":   NewSystemServicesFromResource,
@@ -181,7 +181,7 @@ var SetSectionGeneratorMap = map[string]interface{}{
 // SetSectionParserMap maps INI section names to functions that parse the sections and populate
 // the relevant SecuritySettings fields. The sections not included in this map are handled
 // by ini.MapTo().
-var SetSectionParserMap = map[string]interface{}{
+var SetSectionParserMap = map[string]any{
 	"Service General Setting": LoadSystemServicesFromIni,
 	"Group Membership":        LoadRestrictedGroupsFromIni,
 	"Registry Keys":           LoadRegistryKeysFromIni,
@@ -191,15 +191,15 @@ var SetSectionParserMap = map[string]interface{}{
 
 // Most of the schema blocks in the resource's config are items of type List
 // with max size of 1. These can be just converted via mapstructure.
-func genericSetResourceData(section string, data interface{}, d *schema.ResourceData) error {
-	out := make(map[string]interface{})
+func genericSetResourceData(section string, data any, d *schema.ResourceData) error {
+	out := make(map[string]any)
 	err := mapstructure.Decode(data, &out)
 	if err != nil {
 		return fmt.Errorf("error in genericSetResourceData: %s", err)
 	}
 
 	//lintignore:R001
-	return d.Set(section, []map[string]interface{}{out})
+	return d.Set(section, []map[string]any{out})
 }
 
 // UTFEncodeIniFile returs a byte array containing the encoded version of a string.

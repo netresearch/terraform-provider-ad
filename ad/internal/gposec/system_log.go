@@ -13,7 +13,7 @@ func (p *SystemLog) SetResourceData(section string, d *schema.ResourceData) erro
 }
 
 // WriteSystemLog populates a SystemLog struct from resource data
-func WriteSystemLog(data interface{}, cfg *SecuritySettings) error {
+func WriteSystemLog(data any, cfg *SecuritySettings) error {
 	elp, err := NewEventLogPolicy(data)
 	if err != nil {
 		return err

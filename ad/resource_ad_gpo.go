@@ -55,7 +55,7 @@ func resourceADGPO() *schema.Resource {
 	}
 }
 
-func resourceADGPOCreate(d *schema.ResourceData, meta interface{}) error {
+func resourceADGPOCreate(d *schema.ResourceData, meta any) error {
 	g := winrmhelper.GetGPOFromResource(d)
 	guid, err := g.NewGPO(meta.(*config.ProviderConf))
 	if err != nil {
@@ -65,7 +65,7 @@ func resourceADGPOCreate(d *schema.ResourceData, meta interface{}) error {
 	return resourceADGPORead(d, meta)
 }
 
-func resourceADGPORead(d *schema.ResourceData, meta interface{}) error {
+func resourceADGPORead(d *schema.ResourceData, meta any) error {
 	if d.Id() == "" {
 		return nil
 	}
@@ -85,7 +85,7 @@ func resourceADGPORead(d *schema.ResourceData, meta interface{}) error {
 	return nil
 }
 
-func resourceADGPOUpdate(d *schema.ResourceData, meta interface{}) error {
+func resourceADGPOUpdate(d *schema.ResourceData, meta any) error {
 	g := winrmhelper.GetGPOFromResource(d)
 	_, err := g.UpdateGPO(meta.(*config.ProviderConf), d)
 	if err != nil {
@@ -94,7 +94,7 @@ func resourceADGPOUpdate(d *schema.ResourceData, meta interface{}) error {
 	return resourceADGPORead(d, meta)
 }
 
-func resourceADGPODelete(d *schema.ResourceData, meta interface{}) error {
+func resourceADGPODelete(d *schema.ResourceData, meta any) error {
 	g := winrmhelper.GetGPOFromResource(d)
 	err := g.DeleteGPO(meta.(*config.ProviderConf))
 	if err != nil {

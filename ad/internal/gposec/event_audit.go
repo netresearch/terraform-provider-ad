@@ -24,9 +24,9 @@ func (p *EventAudit) SetResourceData(section string, d *schema.ResourceData) err
 }
 
 // WriteEventAudit populates an EventAudit struct from resource data
-func WriteEventAudit(data interface{}, cfg *SecuritySettings) error {
+func WriteEventAudit(data any, cfg *SecuritySettings) error {
 	eap := &EventAudit{}
-	err := mapstructure.Decode(data.(map[string]interface{}), eap)
+	err := mapstructure.Decode(data.(map[string]any), eap)
 	if err != nil {
 		return err
 	}

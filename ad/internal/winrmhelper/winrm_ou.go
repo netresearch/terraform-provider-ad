@@ -116,7 +116,7 @@ func (o *OrgUnit) Create(conf *config.ProviderConf) (string, error) {
 }
 
 // Update updates an existing OU in the AD tree
-func (o *OrgUnit) Update(conf *config.ProviderConf, changes map[string]interface{}) error {
+func (o *OrgUnit) Update(conf *config.ProviderConf, changes map[string]any) error {
 	if o.DistinguishedName == "" {
 		return fmt.Errorf("Cannot update OU with name %q, distiguished name is empty", o.Name)
 	}

@@ -22,9 +22,9 @@ type RestrictedGroups struct {
 
 // SetResourceData populates resource data based on the RestrictedGroups field values
 func (r *RestrictedGroups) SetResourceData(section string, d *schema.ResourceData) error {
-	out := []map[string]interface{}{}
+	out := []map[string]any{}
 	for _, group := range r.Groups {
-		grp := map[string]interface{}{
+		grp := map[string]any{
 			"group_name":     group.GroupName,
 			"group_members":  group.GroupMembers,
 			"group_memberof": group.GroupParents,
@@ -60,10 +60,10 @@ func (r *RestrictedGroups) SetIniData(f *ini.File) error {
 }
 
 // NewRestrictedGroupsFromResource returns a new struct based on the resoruce's values
-func NewRestrictedGroupsFromResource(data interface{}) (IniSetSection, error) {
+func NewRestrictedGroupsFromResource(data any) (IniSetSection, error) {
 	out := &RestrictedGroups{Groups: []RestrictedGroup{}}
 	for _, item := range data.(*schema.Set).List() {
-		rgs := item.(map[string]interface{})
+		rgs := item.(map[string]any)
 		rg := RestrictedGroup{
 			GroupName:    rgs["group_name"].(string),
 			GroupMembers: rgs["group_members"].(string),

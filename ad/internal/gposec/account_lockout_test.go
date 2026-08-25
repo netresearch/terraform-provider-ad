@@ -8,7 +8,7 @@ import (
 )
 
 func TestWriteAccountLockout(t *testing.T) {
-	data := map[string]interface{}{
+	data := map[string]any{
 		"force_logoff_when_hour_expire": "10",
 	}
 

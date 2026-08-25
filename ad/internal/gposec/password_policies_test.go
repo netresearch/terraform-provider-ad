@@ -8,7 +8,7 @@ import (
 )
 
 func TestWritePasswordPolicies(t *testing.T) {
-	data := map[string]interface{}{
+	data := map[string]any{
 		"maximum_password_age": "10",
 	}
 

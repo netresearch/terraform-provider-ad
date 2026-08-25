@@ -19,9 +19,9 @@ func (p *EventLogPolicy) SetResourceData(section string, d *schema.ResourceData)
 }
 
 // NewEventLogPolicy returns an EventLogPolicy structure populated from resource data
-func NewEventLogPolicy(data interface{}) (EventLogPolicy, error) {
+func NewEventLogPolicy(data any) (EventLogPolicy, error) {
 	elp := EventLogPolicy{}
-	err := mapstructure.Decode(data.(map[string]interface{}), &elp)
+	err := mapstructure.Decode(data.(map[string]any), &elp)
 	if err != nil {
 		return EventLogPolicy{}, err
 	}

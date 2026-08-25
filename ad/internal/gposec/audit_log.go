@@ -13,7 +13,7 @@ func (p *AuditLog) SetResourceData(section string, d *schema.ResourceData) error
 }
 
 // WriteAuditLog populates an AuditLog struct from resource data
-func WriteAuditLog(data interface{}, cfg *SecuritySettings) error {
+func WriteAuditLog(data any, cfg *SecuritySettings) error {
 	elp, err := NewEventLogPolicy(data)
 	if err != nil {
 		return err

@@ -15,7 +15,7 @@ type RegistryKeys struct {
 
 // SetResourceData populates the resource's filed for the given section using the struct's data.
 func (r *RegistryKeys) SetResourceData(section string, d *schema.ResourceData) error {
-	out := []map[string]interface{}{}
+	out := []map[string]any{}
 	for _, valuesLine := range r.Keys {
 		values := strings.SplitN(valuesLine, ",", 3)
 
@@ -23,7 +23,7 @@ func (r *RegistryKeys) SetResourceData(section string, d *schema.ResourceData) e
 			return fmt.Errorf("invalid registry keys line: %s", valuesLine)
 		}
 
-		value := map[string]interface{}{
+		value := map[string]any{
 			"key_name":         values[0],
 			"propagation_mode": values[1],
 			"acl":              values[2],
@@ -49,10 +49,10 @@ func (r *RegistryKeys) SetIniData(f *ini.File) error {
 }
 
 // NewRegistryKeysFromResource returns a new struct based on the resoruce's values
-func NewRegistryKeysFromResource(data interface{}) (IniSetSection, error) {
+func NewRegistryKeysFromResource(data any) (IniSetSection, error) {
 	out := &RegistryKeys{Keys: []string{}}
 	for _, item := range data.(*schema.Set).List() {
-		rk := item.(map[string]interface{})
+		rk := item.(map[string]any)
 		value := fmt.Sprintf(`"%s",%s,"%s"`, rk["key_name"].(string), rk["propagation_mode"].(string), rk["acl"].(string))
 		out.Keys = append(out.Keys, value)
 	}

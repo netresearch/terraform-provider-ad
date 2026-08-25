@@ -63,7 +63,7 @@ func resourceADComputer() *schema.Resource {
 	}
 }
 
-func resourceADComputerRead(d *schema.ResourceData, meta interface{}) error {
+func resourceADComputerRead(d *schema.ResourceData, meta any) error {
 	if d.Id() == "" {
 		return nil
 	}
@@ -88,7 +88,7 @@ func resourceADComputerRead(d *schema.ResourceData, meta interface{}) error {
 	return nil
 }
 
-func resourceADComputerCreate(d *schema.ResourceData, meta interface{}) error {
+func resourceADComputerCreate(d *schema.ResourceData, meta any) error {
 	computer := winrmhelper.NewComputerFromResource(d)
 	guid, err := computer.Create(meta.(*config.ProviderConf))
 	if err != nil {
@@ -98,10 +98,10 @@ func resourceADComputerCreate(d *schema.ResourceData, meta interface{}) error {
 	return resourceADComputerRead(d, meta)
 }
 
-func resourceADComputerUpdate(d *schema.ResourceData, meta interface{}) error {
+func resourceADComputerUpdate(d *schema.ResourceData, meta any) error {
 	computer := winrmhelper.NewComputerFromResource(d)
 	keys := []string{"container", "description"}
-	changes := make(map[string]interface{})
+	changes := make(map[string]any)
 	for _, key := range keys {
 		if d.HasChange(key) {
 			changes[key] = d.Get(key)
@@ -115,7 +115,7 @@ func resourceADComputerUpdate(d *schema.ResourceData, meta interface{}) error {
 	return resourceADComputerRead(d, meta)
 }
 
-func resourceADComputerDelete(d *schema.ResourceData, meta interface{}) error {
+func resourceADComputerDelete(d *schema.ResourceData, meta any) error {
 	if d.Id() == "" {
 		return nil
 	}

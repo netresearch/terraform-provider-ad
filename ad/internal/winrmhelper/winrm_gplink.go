@@ -86,7 +86,7 @@ func (g *GPLink) NewGPLink(conf *config.ProviderConf) (string, error) {
 }
 
 // ModifyGPLink changes a GPO link
-func (g *GPLink) ModifyGPLink(conf *config.ProviderConf, changes map[string]interface{}) error {
+func (g *GPLink) ModifyGPLink(conf *config.ProviderConf, changes map[string]any) error {
 	cmds := []string{fmt.Sprintf("Set-GPLink -guid %q -target %q", g.GPOGuid, g.Target)}
 	keyMap := map[string]string{
 		"enforced": "Enforced",

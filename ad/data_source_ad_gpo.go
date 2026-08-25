@@ -33,7 +33,7 @@ func dataSourceADGPO() *schema.Resource {
 	}
 }
 
-func dataSourceADGPORead(d *schema.ResourceData, meta interface{}) error {
+func dataSourceADGPORead(d *schema.ResourceData, meta any) error {
 	name := winrmhelper.SanitiseTFInput(d, "name")
 	guid := winrmhelper.SanitiseTFInput(d, "guid")
 	gpo, err := winrmhelper.GetGPOFromHost(meta.(*config.ProviderConf), name, guid)

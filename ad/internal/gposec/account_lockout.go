@@ -19,9 +19,9 @@ func (p *AccountLockout) SetResourceData(section string, d *schema.ResourceData)
 }
 
 // WriteAccountLockout populates an AccountLockout struct from resource data
-func WriteAccountLockout(data interface{}, cfg *SecuritySettings) error {
+func WriteAccountLockout(data any, cfg *SecuritySettings) error {
 	al := &AccountLockout{}
-	err := mapstructure.Decode(data.(map[string]interface{}), al)
+	err := mapstructure.Decode(data.(map[string]any), al)
 	if err != nil {
 		return err
 	}

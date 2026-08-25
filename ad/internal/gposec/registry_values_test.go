@@ -36,7 +36,7 @@ func TestRegistryValuesSetResourceData(t *testing.T) {
 		t.FailNow()
 	}
 
-	rkItem := rkSet.List()[0].(map[string]interface{})
+	rkItem := rkSet.List()[0].(map[string]any)
 	registryKey := rkItem["key_name"].(string)
 	propMode := rkItem["value_type"].(string)
 	value := rkItem["value"].(string)
@@ -51,7 +51,7 @@ func newRVFromResource() (*RegistryValues, error) {
 	r.Schema = adschema.GpoSecuritySchema()
 	d := r.TestResourceData()
 
-	rData := []map[string]interface{}{
+	rData := []map[string]any{
 		{
 			"key_name":   `HKLM\Some\Key`,
 			"value_type": "2",

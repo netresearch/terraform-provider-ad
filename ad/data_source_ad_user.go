@@ -199,7 +199,7 @@ func dataSourceADUser() *schema.Resource {
 	}
 }
 
-func dataSourceADUserRead(d *schema.ResourceData, meta interface{}) error {
+func dataSourceADUserRead(d *schema.ResourceData, meta any) error {
 	userID := d.Get("user_id").(string)
 	u, err := winrmhelper.GetUserFromHost(meta.(*config.ProviderConf), userID, nil)
 	if err != nil {

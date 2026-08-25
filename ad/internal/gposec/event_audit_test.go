@@ -8,7 +8,7 @@ import (
 )
 
 func TestWriteEventAudit(t *testing.T) {
-	data := map[string]interface{}{
+	data := map[string]any{
 		"audit_logon_events": "1",
 	}
 

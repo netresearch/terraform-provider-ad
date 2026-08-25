@@ -35,7 +35,7 @@ func TestFileSystemSetResourceData(t *testing.T) {
 		t.FailNow()
 	}
 
-	fsItem := fsSet.List()[0].(map[string]interface{})
+	fsItem := fsSet.List()[0].(map[string]any)
 	path := fsItem["path"].(string)
 	propMode := fsItem["propagation_mode"].(string)
 	acl := fsItem["acl"].(string)
@@ -50,7 +50,7 @@ func newFSFromResource() (*FileSystem, error) {
 	r.Schema = adschema.GpoSecuritySchema()
 	d := r.TestResourceData()
 
-	rData := []map[string]interface{}{
+	rData := []map[string]any{
 		{
 			"path":             `C:\whatever`,
 			"propagation_mode": "2",

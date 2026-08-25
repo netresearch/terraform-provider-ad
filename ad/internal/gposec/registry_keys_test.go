@@ -36,7 +36,7 @@ func TestRegistryKeysSetResourceData(t *testing.T) {
 		t.FailNow()
 	}
 
-	rkItem := rkSet.List()[0].(map[string]interface{})
+	rkItem := rkSet.List()[0].(map[string]any)
 	registryKey := rkItem["key_name"].(string)
 	propMode := rkItem["propagation_mode"].(string)
 	acl := rkItem["acl"].(string)
@@ -51,7 +51,7 @@ func newRKFromResource() (*RegistryKeys, error) {
 	r.Schema = adschema.GpoSecuritySchema()
 	d := r.TestResourceData()
 
-	rData := []map[string]interface{}{
+	rData := []map[string]any{
 		{
 			"key_name":         `HKLM\Some\Key`,
 			"propagation_mode": "2",

@@ -69,7 +69,7 @@ func dataSourceADGroup() *schema.Resource {
 	}
 }
 
-func dataSourceADGroupRead(d *schema.ResourceData, meta interface{}) error {
+func dataSourceADGroupRead(d *schema.ResourceData, meta any) error {
 	groupID := d.Get("group_id").(string)
 
 	g, err := winrmhelper.GetGroupFromHost(meta.(*config.ProviderConf), groupID)
