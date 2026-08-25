@@ -21,9 +21,9 @@ func (p *PasswordPolicies) SetResourceData(section string, d *schema.ResourceDat
 }
 
 // WritePasswordPolicies populates a PasswordPolicies struct from resource data
-func WritePasswordPolicies(data interface{}, cfg *SecuritySettings) error {
+func WritePasswordPolicies(data any, cfg *SecuritySettings) error {
 	pp := &PasswordPolicies{}
-	err := mapstructure.Decode(data.(map[string]interface{}), pp)
+	err := mapstructure.Decode(data.(map[string]any), pp)
 	if err != nil {
 		return err
 	}

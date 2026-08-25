@@ -71,7 +71,7 @@ func resourceADGroup() *schema.Resource {
 	}
 }
 
-func resourceADGroupCreate(d *schema.ResourceData, meta interface{}) error {
+func resourceADGroupCreate(d *schema.ResourceData, meta any) error {
 	u := winrmhelper.GetGroupFromResource(d)
 	guid, err := u.AddGroup(meta.(*config.ProviderConf))
 	if err != nil {
@@ -81,7 +81,7 @@ func resourceADGroupCreate(d *schema.ResourceData, meta interface{}) error {
 	return resourceADGroupRead(d, meta)
 }
 
-func resourceADGroupRead(d *schema.ResourceData, meta interface{}) error {
+func resourceADGroupRead(d *schema.ResourceData, meta any) error {
 	g, err := winrmhelper.GetGroupFromHost(meta.(*config.ProviderConf), d.Id())
 	if err != nil {
 		if strings.Contains(err.Error(), "ADIdentityNotFoundException") {
@@ -106,7 +106,7 @@ func resourceADGroupRead(d *schema.ResourceData, meta interface{}) error {
 	return nil
 }
 
-func resourceADGroupUpdate(d *schema.ResourceData, meta interface{}) error {
+func resourceADGroupUpdate(d *schema.ResourceData, meta any) error {
 	g := winrmhelper.GetGroupFromResource(d)
 	err := g.ModifyGroup(d, meta.(*config.ProviderConf))
 	if err != nil {
@@ -115,7 +115,7 @@ func resourceADGroupUpdate(d *schema.ResourceData, meta interface{}) error {
 	return resourceADGroupRead(d, meta)
 }
 
-func resourceADGroupDelete(d *schema.ResourceData, meta interface{}) error {
+func resourceADGroupDelete(d *schema.ResourceData, meta any) error {
 	g, err := winrmhelper.GetGroupFromHost(meta.(*config.ProviderConf), d.Id())
 	if err != nil {
 		if strings.Contains(err.Error(), "ADIdentityNotFoundException") {

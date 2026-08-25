@@ -52,7 +52,7 @@ func TestRestrictedGroupsSetResourceData(t *testing.T) {
 	}
 
 	for _, rg := range rrSet.List() {
-		group := rg.(map[string]interface{})
+		group := rg.(map[string]any)
 		groupName := group["group_name"]
 		groupMembers := group["group_members"]
 		groupParents := group["group_memberof"]
@@ -80,7 +80,7 @@ func newRGFromResource() (*RestrictedGroups, error) {
 	r.Schema = adschema.GpoSecuritySchema()
 	d := r.TestResourceData()
 
-	rData := []map[string]interface{}{
+	rData := []map[string]any{
 		{
 			"group_name":     "group1",
 			"group_members":  "group2",

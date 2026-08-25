@@ -56,7 +56,7 @@ func resourceADOU() *schema.Resource {
 	}
 }
 
-func resourceADOURead(d *schema.ResourceData, meta interface{}) error {
+func resourceADOURead(d *schema.ResourceData, meta any) error {
 	if d.Id() == "" {
 		return nil
 	}
@@ -81,7 +81,7 @@ func resourceADOURead(d *schema.ResourceData, meta interface{}) error {
 	return nil
 }
 
-func resourceADOUCreate(d *schema.ResourceData, meta interface{}) error {
+func resourceADOUCreate(d *schema.ResourceData, meta any) error {
 	ou := winrmhelper.NewOrgUnitFromResource(d)
 	guid, err := ou.Create(meta.(*config.ProviderConf))
 	if err != nil {
@@ -92,11 +92,11 @@ func resourceADOUCreate(d *schema.ResourceData, meta interface{}) error {
 	return resourceADOURead(d, meta)
 }
 
-func resourceADOUUpdate(d *schema.ResourceData, meta interface{}) error {
+func resourceADOUUpdate(d *schema.ResourceData, meta any) error {
 	ou := winrmhelper.NewOrgUnitFromResource(d)
 
 	keys := []string{"description", "name", "path", "protected"}
-	changes := make(map[string]interface{})
+	changes := make(map[string]any)
 	for _, key := range keys {
 		if d.HasChange(key) {
 			changes[key] = d.Get(key)
@@ -110,7 +110,7 @@ func resourceADOUUpdate(d *schema.ResourceData, meta interface{}) error {
 	return resourceADOURead(d, meta)
 }
 
-func resourceADOUDelete(d *schema.ResourceData, meta interface{}) error {
+func resourceADOUDelete(d *schema.ResourceData, meta any) error {
 	ou := winrmhelper.NewOrgUnitFromResource(d)
 	err := ou.Delete(meta.(*config.ProviderConf))
 	if err != nil {

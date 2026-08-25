@@ -30,7 +30,7 @@ func resourceADGPOSecurity() *schema.Resource {
 	}
 }
 
-func resourceADGPOSecurityCreate(d *schema.ResourceData, meta interface{}) error {
+func resourceADGPOSecurityCreate(d *schema.ResourceData, meta any) error {
 	winrmCPClient, err := meta.(*config.ProviderConf).AcquireWinRMCPClient()
 	if err != nil {
 		return err
@@ -72,7 +72,7 @@ func resourceADGPOSecurityCreate(d *schema.ResourceData, meta interface{}) error
 	return resourceADGPOSecurityRead(d, meta)
 }
 
-func resourceADGPOSecurityRead(d *schema.ResourceData, meta interface{}) error {
+func resourceADGPOSecurityRead(d *schema.ResourceData, meta any) error {
 	resourceID := d.Id()
 	toks := strings.Split(resourceID, "_")
 	if len(toks) != 2 {
@@ -105,7 +105,7 @@ func resourceADGPOSecurityRead(d *schema.ResourceData, meta interface{}) error {
 	return err
 }
 
-func resourceADGPOSecurityUpdate(d *schema.ResourceData, meta interface{}) error {
+func resourceADGPOSecurityUpdate(d *schema.ResourceData, meta any) error {
 	winrmCPClient, err := meta.(*config.ProviderConf).AcquireWinRMCPClient()
 	if err != nil {
 		return err
@@ -155,7 +155,7 @@ func resourceADGPOSecurityUpdate(d *schema.ResourceData, meta interface{}) error
 	return resourceADGPOSecurityRead(d, meta)
 }
 
-func resourceADGPOSecurityDelete(d *schema.ResourceData, meta interface{}) error {
+func resourceADGPOSecurityDelete(d *schema.ResourceData, meta any) error {
 	winrmCPClient, err := meta.(*config.ProviderConf).AcquireWinRMCPClient()
 	if err != nil {
 		return err

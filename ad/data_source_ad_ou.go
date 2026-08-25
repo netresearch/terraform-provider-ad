@@ -50,7 +50,7 @@ func dataSourceADOU() *schema.Resource {
 	}
 }
 
-func dataSourceADOURead(d *schema.ResourceData, meta interface{}) error {
+func dataSourceADOURead(d *schema.ResourceData, meta any) error {
 	name := winrmhelper.SanitiseTFInput(d, "name")
 	path := winrmhelper.SanitiseTFInput(d, "path")
 	dn := winrmhelper.SanitiseTFInput(d, "dn")

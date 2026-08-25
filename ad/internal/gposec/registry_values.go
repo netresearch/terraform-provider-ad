@@ -16,10 +16,10 @@ type RegistryValues struct {
 
 // SetResourceData populates the resource's filed for the given section using the struct's data.
 func (r *RegistryValues) SetResourceData(section string, d *schema.ResourceData) error {
-	out := []map[string]interface{}{}
+	out := []map[string]any{}
 	for _, valuesLine := range r.Values {
 		values := strings.SplitN(valuesLine, ",", 3)
-		value := map[string]interface{}{
+		value := map[string]any{
 			"key_name":   values[0],
 			"value_type": values[1],
 			"value":      values[2],
@@ -45,10 +45,10 @@ func (r *RegistryValues) SetIniData(f *ini.File) error {
 }
 
 // NewRegistryValuesFromResource returns a new struct based on the resoruce's values
-func NewRegistryValuesFromResource(data interface{}) (IniSetSection, error) {
+func NewRegistryValuesFromResource(data any) (IniSetSection, error) {
 	out := &RegistryValues{Values: []string{}}
 	for _, item := range data.(*schema.Set).List() {
-		rv := item.(map[string]interface{})
+		rv := item.(map[string]any)
 		value := fmt.Sprintf(`"%s",%s,"%s"`, rv["key_name"].(string), rv["value_type"].(string), rv["value"].(string))
 		out.Values = append(out.Values, value)
 	}

@@ -8,7 +8,7 @@ import (
 )
 
 func TestWriteSystemLog(t *testing.T) {
-	data := map[string]interface{}{
+	data := map[string]any{
 		"maximum_log_size": "10",
 	}
 

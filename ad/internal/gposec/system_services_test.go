@@ -36,7 +36,7 @@ func TestSystemServicesSetResourceData(t *testing.T) {
 		t.FailNow()
 	}
 
-	svcItem := svcsSet.List()[0].(map[string]interface{})
+	svcItem := svcsSet.List()[0].(map[string]any)
 	svcName := svcItem["service_name"].(string)
 	svcMode := svcItem["startup_mode"].(string)
 	svcACL := svcItem["acl"].(string)
@@ -51,7 +51,7 @@ func newSvcFromResource() (*SystemServices, error) {
 	r.Schema = adschema.GpoSecuritySchema()
 	d := r.TestResourceData()
 
-	rData := []map[string]interface{}{
+	rData := []map[string]any{
 		{
 			"service_name": `somesvc`,
 			"startup_mode": "2",

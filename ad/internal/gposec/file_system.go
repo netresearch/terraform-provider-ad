@@ -15,10 +15,10 @@ type FileSystem struct {
 
 // SetResourceData populates the resource's filed for the given section using the struct's data.
 func (r *FileSystem) SetResourceData(section string, d *schema.ResourceData) error {
-	out := []map[string]interface{}{}
+	out := []map[string]any{}
 	for _, valuesLine := range r.Paths {
 		values := strings.SplitN(valuesLine, ",", 3)
-		value := map[string]interface{}{
+		value := map[string]any{
 			"path":             values[0],
 			"propagation_mode": values[1],
 			"acl":              values[2],
@@ -44,10 +44,10 @@ func (r *FileSystem) SetIniData(f *ini.File) error {
 }
 
 // NewFileSystemFromResource returns a new struct based on the resource's values
-func NewFileSystemFromResource(data interface{}) (IniSetSection, error) {
+func NewFileSystemFromResource(data any) (IniSetSection, error) {
 	out := &FileSystem{Paths: []string{}}
 	for _, item := range data.(*schema.Set).List() {
-		fs := item.(map[string]interface{})
+		fs := item.(map[string]any)
 		value := fmt.Sprintf(`"%s",%s,"%s"`, fs["path"].(string), fs["propagation_mode"].(string), fs["acl"].(string))
 		out.Paths = append(out.Paths, value)
 	}

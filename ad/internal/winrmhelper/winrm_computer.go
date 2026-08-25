@@ -116,7 +116,7 @@ func (m *Computer) Create(conf *config.ProviderConf) (string, error) {
 }
 
 // Update updates an existing Computer objects in the AD tree
-func (m *Computer) Update(conf *config.ProviderConf, changes map[string]interface{}) error {
+func (m *Computer) Update(conf *config.ProviderConf, changes map[string]any) error {
 	if m.GUID == "" {
 		return fmt.Errorf("cannot update computer object with name %q, guid is not set", m.Name)
 	}

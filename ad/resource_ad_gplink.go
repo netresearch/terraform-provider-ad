@@ -26,7 +26,7 @@ func resourceADGPLink() *schema.Resource {
 				Type:     schema.TypeString,
 				Required: true,
 				ForceNew: true,
-				ValidateFunc: func(val interface{}, key string) (warns []string, errs []error) {
+				ValidateFunc: func(val any, key string) (warns []string, errs []error) {
 					_, err := uuid.ParseUUID(val.(string))
 					if err != nil {
 						errs = append(errs, fmt.Errorf("%q is not a valid uuid", val.(string)))
@@ -64,7 +64,7 @@ func resourceADGPLink() *schema.Resource {
 	}
 }
 
-func resourceADGPLinkRead(d *schema.ResourceData, meta interface{}) error {
+func resourceADGPLinkRead(d *schema.ResourceData, meta any) error {
 	idParts := strings.SplitN(d.Id(), "_", 2)
 	if len(idParts) != 2 {
 		return fmt.Errorf("malformed ID for GPLink resource with ID %q", d.Id())
@@ -87,7 +87,7 @@ func resourceADGPLinkRead(d *schema.ResourceData, meta interface{}) error {
 	return nil
 }
 
-func resourceADGPLinkCreate(d *schema.ResourceData, meta interface{}) error {
+func resourceADGPLinkCreate(d *schema.ResourceData, meta any) error {
 	gplink := winrmhelper.GetGPLinkFromResource(d)
 	gpLinkID, err := gplink.NewGPLink(meta.(*config.ProviderConf))
 	if err != nil {
@@ -98,9 +98,9 @@ func resourceADGPLinkCreate(d *schema.ResourceData, meta interface{}) error {
 	return resourceADGPLinkRead(d, meta)
 }
 
-func resourceADGPLinkUpdate(d *schema.ResourceData, meta interface{}) error {
+func resourceADGPLinkUpdate(d *schema.ResourceData, meta any) error {
 	keys := []string{"enforced", "enabled", "order"}
-	changes := make(map[string]interface{})
+	changes := make(map[string]any)
 	for _, key := range keys {
 		if d.HasChange(key) {
 			changes[key] = d.Get(key)
@@ -115,7 +115,7 @@ func resourceADGPLinkUpdate(d *schema.ResourceData, meta interface{}) error {
 	return resourceADGPLinkRead(d, meta)
 }
 
-func resourceADGPLinkDelete(d *schema.ResourceData, meta interface{}) error {
+func resourceADGPLinkDelete(d *schema.ResourceData, meta any) error {
 	gplink := winrmhelper.GetGPLinkFromResource(d)
 	err := gplink.RemoveGPLink(meta.(*config.ProviderConf))
 	if err != nil {

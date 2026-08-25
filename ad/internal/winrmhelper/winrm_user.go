@@ -59,7 +59,7 @@ type User struct {
 	Username               string `json:"Name"`
 	PasswordNeverExpires   bool
 	CannotChangePassword   bool
-	CustomAttributes       map[string]interface{}
+	CustomAttributes       map[string]any
 }
 
 // NewUser creates the user by running the New-ADUser powershell command
@@ -322,7 +322,7 @@ func (u *User) ModifyUser(d *schema.ResourceData, conf *config.ProviderConf) err
 		toReplace := []string{}
 		toAdd := []string{}
 
-		var oldSortedMap map[string]interface{}
+		var oldSortedMap map[string]any
 		if oldValue.(string) != "" {
 			oldMap, err := structure.ExpandJsonFromString(oldValue.(string))
 			if err != nil {
@@ -484,8 +484,8 @@ func (u *User) getOtherAttributes() (string, error) {
 		cleanKey := SanitiseString(k)
 		var cleanValue string
 		if reflect.ValueOf(v).Kind() == reflect.Slice {
-			quotedStrings := make([]string, len(v.([]interface{})))
-			for idx, s := range v.([]interface{}) {
+			quotedStrings := make([]string, len(v.([]any)))
+			for idx, s := range v.([]any) {
 				// Using %q here will cause double quotes inside the string to be escaped with \"
 				// which is not desirable in Powershell
 				quotedStrings[idx] = GetString(s.(string))
@@ -556,7 +556,7 @@ func GetUserFromResource(d *schema.ResourceData) (*User, error) {
 
 	ca, ok := d.Get("custom_attributes").(string)
 	if ok && len(ca) > 0 {
-		user.CustomAttributes = make(map[string]interface{})
+		user.CustomAttributes = make(map[string]any)
 		customAttributes, err := structure.ExpandJsonFromString(ca)
 		if err != nil {
 			return nil, fmt.Errorf("while unmarshalling custom attributes JSON doc: %s", err)
@@ -638,15 +638,15 @@ func unmarshallUser(input []byte, customAttributes []string) (*User, error) {
 		return &user, nil
 	}
 
-	var userMapIntf interface{}
+	var userMapIntf any
 	err = json.Unmarshal(input, &userMapIntf)
 	if err != nil {
 		log.Printf("[DEBUG] Failed to unmarshall json document with error %q, document was: %s", err, string(input))
 		return nil, fmt.Errorf("failed while unmarshalling json response: %s", err)
 	}
 
-	userMap := userMapIntf.(map[string]interface{})
-	user.CustomAttributes = make(map[string]interface{})
+	userMap := userMapIntf.(map[string]any)
+	user.CustomAttributes = make(map[string]any)
 	for _, property := range customAttributes {
 		if val, ok := userMap[property]; ok {
 			user.CustomAttributes[property] = val

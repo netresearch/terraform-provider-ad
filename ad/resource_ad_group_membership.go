@@ -39,7 +39,7 @@ func resourceADGroupMembership() *schema.Resource {
 	}
 }
 
-func resourceADGroupMembershipRead(d *schema.ResourceData, meta interface{}) error {
+func resourceADGroupMembershipRead(d *schema.ResourceData, meta any) error {
 	toks := strings.Split(d.Id(), "_")
 
 	gm, err := winrmhelper.NewGroupMembershipFromHost(meta.(*config.ProviderConf), toks[0])
@@ -56,7 +56,7 @@ func resourceADGroupMembershipRead(d *schema.ResourceData, meta interface{}) err
 	return nil
 }
 
-func resourceADGroupMembershipCreate(d *schema.ResourceData, meta interface{}) error {
+func resourceADGroupMembershipCreate(d *schema.ResourceData, meta any) error {
 	gm, err := winrmhelper.NewGroupMembershipFromState(d)
 	if err != nil {
 		return err
@@ -78,7 +78,7 @@ func resourceADGroupMembershipCreate(d *schema.ResourceData, meta interface{}) e
 	return nil
 }
 
-func resourceADGroupMembershipUpdate(d *schema.ResourceData, meta interface{}) error {
+func resourceADGroupMembershipUpdate(d *schema.ResourceData, meta any) error {
 	gm, err := winrmhelper.NewGroupMembershipFromState(d)
 	if err != nil {
 		return err
@@ -92,7 +92,7 @@ func resourceADGroupMembershipUpdate(d *schema.ResourceData, meta interface{}) e
 	return resourceADGroupMembershipRead(d, meta)
 }
 
-func resourceADGroupMembershipDelete(d *schema.ResourceData, meta interface{}) error {
+func resourceADGroupMembershipDelete(d *schema.ResourceData, meta any) error {
 	gm, err := winrmhelper.NewGroupMembershipFromState(d)
 	if err != nil {
 		return err

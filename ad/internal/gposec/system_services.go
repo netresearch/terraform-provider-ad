@@ -15,14 +15,14 @@ type SystemServices struct {
 
 // SetResourceData populates resource data based on the SystemServices field values
 func (r *SystemServices) SetResourceData(section string, d *schema.ResourceData) error {
-	out := []map[string]interface{}{}
+	out := []map[string]any{}
 	for _, svcLine := range r.Services {
 		fields := strings.SplitN(svcLine, ",", 3)
 		if len(fields) != 3 {
 			return fmt.Errorf("invalid services line: %s", svcLine)
 		}
 
-		svc := map[string]interface{}{
+		svc := map[string]any{
 			"service_name": fields[0],
 			"startup_mode": fields[1],
 			"acl":          fields[2],
@@ -49,10 +49,10 @@ func (r *SystemServices) SetIniData(f *ini.File) error {
 
 // NewSystemServicesFromResource returns a new SystemServices structure populated
 // with data from the resources.
-func NewSystemServicesFromResource(data interface{}) (IniSetSection, error) {
+func NewSystemServicesFromResource(data any) (IniSetSection, error) {
 	out := &SystemServices{Services: []string{}}
 	for _, item := range data.(*schema.Set).List() {
-		ss := item.(map[string]interface{})
+		ss := item.(map[string]any)
 		service := fmt.Sprintf(`"%s",%s,"%s"`, ss["service_name"].(string), ss["startup_mode"].(string), ss["acl"].(string))
 		out.Services = append(out.Services, service)
 	}

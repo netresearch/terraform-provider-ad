@@ -13,7 +13,7 @@ func (p *ApplicationLog) SetResourceData(section string, d *schema.ResourceData)
 }
 
 // WriteApplicationLog populates a WriteApplicationLog struct from resource data
-func WriteApplicationLog(data interface{}, cfg *SecuritySettings) error {
+func WriteApplicationLog(data any, cfg *SecuritySettings) error {
 	elp, err := NewEventLogPolicy(data)
 	if err != nil {
 		return err

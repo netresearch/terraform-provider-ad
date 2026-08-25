@@ -5,7 +5,7 @@ import (
 )
 
 func TestWriteEventLogPolicy(t *testing.T) {
-	data := map[string]interface{}{
+	data := map[string]any{
 		"maximum_log_size": "10",
 	}
 

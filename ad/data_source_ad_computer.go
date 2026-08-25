@@ -45,7 +45,7 @@ func dataSourceADComputer() *schema.Resource {
 	}
 }
 
-func dataSourceADComputerRead(d *schema.ResourceData, meta interface{}) error {
+func dataSourceADComputerRead(d *schema.ResourceData, meta any) error {
 	dn := winrmhelper.SanitiseTFInput(d, "dn")
 	guid := winrmhelper.SanitiseTFInput(d, "guid")
 	computerID := winrmhelper.SanitiseTFInput(d, "computer_id")

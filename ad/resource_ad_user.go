@@ -3,6 +3,7 @@ package ad
 import (
 	"fmt"
 	"log"
+	"maps"
 	"reflect"
 	"strings"
 
@@ -263,7 +264,7 @@ func suppressJsonDiff(k, old, new string, d *schema.ResourceData) bool {
 	return reflect.DeepEqual(oldSortedMap, newSortedMap)
 }
 
-func resourceADUserCreate(d *schema.ResourceData, meta interface{}) error {
+func resourceADUserCreate(d *schema.ResourceData, meta any) error {
 	u, err := winrmhelper.GetUserFromResource(d)
 	if err != nil {
 		return fmt.Errorf("while building a User struct from resource data: %s", err)
@@ -276,10 +277,8 @@ func resourceADUserCreate(d *schema.ResourceData, meta interface{}) error {
 	d.SetId(guid)
 	// We need to set this so we can then retrieve the list of attributes to look for while "reading"
 	if u.CustomAttributes != nil {
-		caMap := make(map[string]interface{})
-		for k, v := range u.CustomAttributes {
-			caMap[k] = v
-		}
+		caMap := make(map[string]any)
+		maps.Copy(caMap, u.CustomAttributes)
 		ca, err := structure.FlattenJsonToString(caMap)
 		if err != nil {
 			return err
@@ -290,7 +289,7 @@ func resourceADUserCreate(d *schema.ResourceData, meta interface{}) error {
 	return resourceADUserRead(d, meta)
 }
 
-func resourceADUserRead(d *schema.ResourceData, meta interface{}) error {
+func resourceADUserRead(d *schema.ResourceData, meta any) error {
 	log.Printf("Reading ad_user resource for user with guid: %q", d.Id())
 	// get attribute keys from json blob
 	caKeys, err := extractCustAttrKeys(d)
@@ -361,7 +360,7 @@ func resourceADUserRead(d *schema.ResourceData, meta interface{}) error {
 	return nil
 }
 
-func resourceADUserUpdate(d *schema.ResourceData, meta interface{}) error {
+func resourceADUserUpdate(d *schema.ResourceData, meta any) error {
 	u, err := winrmhelper.GetUserFromResource(d)
 	if err != nil {
 		return err
@@ -374,7 +373,7 @@ func resourceADUserUpdate(d *schema.ResourceData, meta interface{}) error {
 	return resourceADUserRead(d, meta)
 }
 
-func resourceADUserDelete(d *schema.ResourceData, meta interface{}) error {
+func resourceADUserDelete(d *schema.ResourceData, meta any) error {
 	u, err := winrmhelper.GetUserFromHost(meta.(*config.ProviderConf), d.Id(), nil)
 	if err != nil {
 		if strings.Contains(err.Error(), "ADIdentityNotFoundException") {

@@ -21,9 +21,9 @@ func (p *KerberosPolicy) SetResourceData(section string, d *schema.ResourceData)
 }
 
 // WriteKerberosPolicy populates a KerberosSettings struct from resource data
-func WriteKerberosPolicy(data interface{}, cfg *SecuritySettings) error {
+func WriteKerberosPolicy(data any, cfg *SecuritySettings) error {
 	ks := &KerberosPolicy{}
-	err := mapstructure.Decode(data.(map[string]interface{}), ks)
+	err := mapstructure.Decode(data.(map[string]any), ks)
 	if err != nil {
 		return err
 	}

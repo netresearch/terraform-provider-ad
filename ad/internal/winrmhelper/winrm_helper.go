@@ -119,7 +119,7 @@ func SetMachineExtensionNames(conf *config.ProviderConf, gpoDN, value string) er
 	return nil
 }
 
-func GetString(v interface{}) string {
+func GetString(v any) string {
 	var out string
 	kind := reflect.ValueOf(v).Kind()
 	switch kind {
@@ -140,11 +140,11 @@ func GetString(v interface{}) string {
 // array that gets converted to a list. It's not guaranteed that the order of the values returned by windows
 // will match the order set by the user in the config, so we just check the members of the custom attributes map
 // and if a slice is found then it's sorted before we compare it.
-func SortInnerSlice(m map[string]interface{}) map[string]interface{} {
+func SortInnerSlice(m map[string]any) map[string]any {
 	for k, v := range m {
 		if reflect.ValueOf(v).Kind() == reflect.Slice {
-			newVal := make([]string, len(v.([]interface{})))
-			for idx, attr := range v.([]interface{}) {
+			newVal := make([]string, len(v.([]any)))
+			for idx, attr := range v.([]any) {
 				newVal[idx] = GetString(attr)
 			}
 			sort.Strings(newVal)
