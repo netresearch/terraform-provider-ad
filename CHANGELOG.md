@@ -1,3 +1,12 @@
+## v0.4.0 (netresearch fork, August 26, 2026)
+
+* dependencies: CI and release builds now use Go 1.27.0 (`.go-version`); the `go` directive stays at 1.25.8 ([#22](https://github.com/netresearch/terraform-provider-ad/pull/22))
+* dependencies: all Go dependencies updated across the module graph ([#23](https://github.com/netresearch/terraform-provider-ad/pull/23))
+* internal: `interface{}` replaced by `any` across the codebase via `go fix`; one map-copy loop replaced by `maps.Copy` ([#22](https://github.com/netresearch/terraform-provider-ad/pull/22))
+* tooling: pinned golangci-lint updated to v2.13.1 ([#24](https://github.com/netresearch/terraform-provider-ad/pull/24))
+
+<!-- Upstream hashicorp/terraform-provider-ad history below; the netresearch fork re-versioned from v0.1.0. -->
+
 ## 0.5.0 (March 28, 2024)
 
 * dependencies: update go to `1.21` [GH-187]
