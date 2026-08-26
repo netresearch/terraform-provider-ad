@@ -1,0 +1,18 @@
+name: Auto-merge dependency PRs
+
+# pull_request_target is required: approving/enabling auto-merge on fork
+# dependency PRs needs a write-scoped token, which pull_request does not
+# provide. The called reusable workflow only runs gh-CLI review/merge steps
+# gated on dependabot/renovate authorship (no checkout or execution of
+# untrusted PR code), so the usual pull_request_target risk does not apply.
+on: # zizmor: ignore[dangerous-triggers]
+  pull_request_target:
+
+permissions: {}
+
+jobs:
+  auto-merge:
+    uses: netresearch/.github/.github/workflows/auto-merge-deps.yml@main
+    permissions:
+      contents: write
+      pull-requests: write

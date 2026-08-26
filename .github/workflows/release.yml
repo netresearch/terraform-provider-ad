@@ -1,43 +1,16 @@
 name: Release
 
 on:
-  workflow_dispatch:
   push:
-    tags:
-      - "v*"
+    tags: ['v*']
+  workflow_dispatch:
 
-permissions:
-  contents: read
+permissions: {}
 
 jobs:
-  release:
-    runs-on: ubuntu-latest
-    name: Release Provider
+  create:
+    uses: netresearch/.github/.github/workflows/golib-create-release.yml@main
     permissions:
       contents: write
-    steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-        with:
-          # Allow goreleaser to access older tag information.
-          fetch-depth: 0
-      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
-        with:
-          go-version-file: .go-version
-          cache: true
-
-      - name: Generate Release Notes
-        run: sed -n -e "1{/# /d;}" -e "2{/^$/d;}" -e "/# $(git describe --abbrev=0 --exclude="$(git describe --abbrev=0 --match='v*.*.*' --tags)" --match='v*.*.*' --tags | tr -d v)/q;p" CHANGELOG.md > /tmp/release-notes.txt
-
-      - name: Import GPG key
-        uses: crazy-max/ghaction-import-gpg@2dc316deee8e90f13e1a351ab510b4d5bc0c82cd # v7.0.0
-        id: import_gpg
-        with:
-          gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
-          passphrase: ${{ secrets.GPG_PASSPHRASE }}
-      - name: Release provider
-        uses: goreleaser/goreleaser-action@f06c13b6b1a9625abc9e6e439d9c05a8f2190e94 # v7.2.3
-        with:
-          args: release --release-notes /tmp/release-notes.txt --clean
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GPG_FINGERPRINT: ${{ secrets.GPG_FINGERPRINT }}
+      id-token: write
+      attestations: write
