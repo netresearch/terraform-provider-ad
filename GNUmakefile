@@ -15,7 +15,7 @@ tools:
 	go install github.com/bflad/tfproviderdocs@latest
 	go install github.com/katbyte/terrafmt@latest
 	go install mvdan.cc/gofumpt@latest
-	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/v2.12.2/install.sh | sh -s -- -b "$$(go env GOPATH || $$GOPATH)"/bin v2.12.2
+	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/v2.13.1/install.sh | sh -s -- -b "$$(go env GOPATH || $$GOPATH)"/bin v2.13.1
 
 build: fmtcheck
 	go install
