@@ -335,19 +335,7 @@ func (u *User) ModifyUser(d *schema.ResourceData, conf *config.ProviderConf) err
 		for k, v := range oldSortedMap {
 			if newVal, ok := newSortedMap[k]; ok {
 				if !reflect.DeepEqual(v, newVal) {
-					var out string
-					if reflect.ValueOf(newVal).Kind() == reflect.Slice {
-						quotedStrings := make([]string, len(newVal.([]string)))
-						for idx, s := range newVal.([]string) {
-							// Using %q here will cause double quotes inside the string to be escaped with \"
-							// which is not desirable in Powershell
-							quotedStrings[idx] = fmt.Sprintf(`"%s"`, s)
-						}
-						out = strings.Join(quotedStrings, ",")
-					} else {
-						out = fmt.Sprintf(`"%s"`, newVal.(string))
-					}
-					toReplace = append(toReplace, fmt.Sprintf("%s=%s", SanitiseString(k), out))
+					toReplace = append(toReplace, PSHashtableEntry(k, PSHashtableValue(newVal)))
 				}
 			} else {
 				toClear = append(toClear, SanitiseString(k))
@@ -356,19 +344,7 @@ func (u *User) ModifyUser(d *schema.ResourceData, conf *config.ProviderConf) err
 
 		for k, newVal := range newSortedMap {
 			if _, ok := oldSortedMap[k]; !ok {
-				var out string
-				if reflect.ValueOf(newVal).Kind() == reflect.Slice {
-					quotedStrings := make([]string, len(newVal.([]string)))
-					for idx, s := range newVal.([]string) {
-						// Using %q here will cause double quotes inside the string to be escaped with \"
-						// which is not desirable in Powershell
-						quotedStrings[idx] = s
-					}
-					out = strings.Join(quotedStrings, ",")
-				} else {
-					out = newVal.(string)
-				}
-				toAdd = append(toAdd, fmt.Sprintf("%s=%s", SanitiseString(k), out))
+				toAdd = append(toAdd, PSHashtableEntry(k, PSHashtableValue(newVal)))
 			}
 		}
 
@@ -484,20 +460,22 @@ func (u *User) DeleteUser(conf *config.ProviderConf) error {
 func (u *User) getOtherAttributes() (string, error) {
 	out := []string{}
 	for k, v := range u.CustomAttributes {
-		cleanKey := SanitiseString(k)
 		var cleanValue string
 		if reflect.ValueOf(v).Kind() == reflect.Slice {
 			quotedStrings := make([]string, len(v.([]any)))
 			for idx, s := range v.([]any) {
 				// Using %q here will cause double quotes inside the string to be escaped with \"
 				// which is not desirable in Powershell
-				quotedStrings[idx] = GetString(s.(string))
+				// GetString takes any and formats numbers and booleans itself;
+				// asserting to string here panics on a custom attribute that is
+				// not one, which JSON readily produces.
+				quotedStrings[idx] = GetString(s)
 			}
 			cleanValue = strings.Join(quotedStrings, ",")
 		} else {
-			cleanValue = GetString(v.(string))
+			cleanValue = GetString(v)
 		}
-		out = append(out, fmt.Sprintf(`'%s'=%s`, cleanKey, cleanValue))
+		out = append(out, PSHashtableEntry(k, cleanValue))
 	}
 	finalAttrString := strings.Join(out, ";")
 	return fmt.Sprintf("@{%s}", finalAttrString), nil
@@ -661,12 +639,23 @@ func unmarshallUser(input []byte, customAttributes []string) (*User, error) {
 	var accountControlMap = map[string]int64{
 		"disabled":               0x00000002,
 		"password_never_expires": 0x00010000,
-		"cannot_change_password": 0x00000040,
 	}
 
 	user.Enabled = !(user.UserAccountControl&accountControlMap["disabled"] != 0)
 	user.PasswordNeverExpires = user.UserAccountControl&accountControlMap["password_never_expires"] != 0
-	user.CannotChangePassword = user.UserAccountControl&accountControlMap["cannot_change_password"] != 0
+
+	// CannotChangePassword is deliberately NOT derived from userAccountControl.
+	// Active Directory implements it as a deny ACE on the Change Password right,
+	// and Microsoft documents PASSWD_CANT_CHANGE (0x40) as a flag that cannot be
+	// set directly and is not reflected in the attribute — so deriving it always
+	// produced false regardless of the account's real setting. Get-ADUser
+	// -properties * returns CannotChangePassword as its own property, and the
+	// User struct has no json tag on that field, so encoding/json already fills
+	// it in case-insensitively. The derivation was overwriting the correct value
+	// with a constant false.
+	//
+	// PasswordNeverExpires above is a genuine userAccountControl bit
+	// (DONT_EXPIRE_PASSWORD, 0x10000) and stays derived.
 
 	if customAttributes == nil {
 		return &user, nil

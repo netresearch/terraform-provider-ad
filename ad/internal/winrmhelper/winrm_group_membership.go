@@ -104,13 +104,54 @@ func (g *GroupMembership) getGroupMembers(conf *config.ProviderConf) ([]*GroupMe
 	return gm, nil
 }
 
+// maxMemberListLength caps the rendered member list of a single
+// Add-/Remove-ADGroupMember call.
+//
+// Windows limits a command line to 8191 characters. The command is transported
+// as UTF-16LE base64, which inflates it by roughly 8/3, so the raw command has
+// to stay near 3000 characters. 2000 leaves room for the operation name, the
+// group GUID and the switches, and is deliberately conservative: members are
+// identified by GUID, SID, SAM account name or distinguished name, and a DN of
+// the form CN=First Last,OU=Department,DC=example,DC=com is an order of
+// magnitude longer than a GUID. Chunking by member count instead — as the
+// upstream patch does, at 50 — holds for GUIDs and still overflows for DNs.
+const maxMemberListLength = 2000
+
+// chunkMembers splits members so each chunk renders to at most budget
+// characters. A single member longer than the budget is emitted in a chunk of
+// its own rather than dropped: the command will fail, but with the directory's
+// own error rather than silently missing a member.
+func chunkMembers(members []*GroupMember, budget int) [][]*GroupMember {
+	if len(members) == 0 {
+		return nil
+	}
+
+	var chunks [][]*GroupMember
+	var current []*GroupMember
+	length := 0
+
+	for _, m := range members {
+		// Each rendered member costs its quoted length plus the joining comma.
+		cost := len(fmt.Sprintf("%q", m.GUID)) + 1
+
+		if len(current) > 0 && length+cost > budget {
+			chunks = append(chunks, current)
+			current = nil
+			length = 0
+		}
+
+		current = append(current, m)
+		length += cost
+	}
+
+	return append(chunks, current)
+}
+
 func (g *GroupMembership) bulkGroupMembersOp(conf *config.ProviderConf, operation string, members []*GroupMember) error {
 	if len(members) == 0 {
 		return nil
 	}
 
-	memberList := getMembershipList(members)
-	cmd := fmt.Sprintf("%s -Identity %q %s -Confirm:$false", operation, g.GroupGUID, memberList)
 	psOpts := CreatePSCommandOpts{
 		JSONOutput:      false,
 		ForceArray:      false,
@@ -120,13 +161,19 @@ func (g *GroupMembership) bulkGroupMembersOp(conf *config.ProviderConf, operatio
 		Password:        conf.Settings.WinRMPassword,
 		Server:          conf.IdentifyDomainController(),
 	}
-	psCmd := NewPSCommand([]string{cmd}, psOpts)
-	result, err := psCmd.Run(conf)
 
-	if err != nil {
-		return fmt.Errorf("while running %s: %s", operation, err)
-	} else if result.ExitCode != 0 {
-		return fmt.Errorf("command %s exited with a non-zero exit code(%d), stderr: %s, stdout: %s", operation, result.ExitCode, result.StdErr, result.Stdout)
+	for _, chunk := range chunkMembers(members, maxMemberListLength) {
+		memberList := getMembershipList(chunk)
+		cmd := fmt.Sprintf("%s -Identity %q %s -Confirm:$false", operation, g.GroupGUID, memberList)
+
+		psCmd := NewPSCommand([]string{cmd}, psOpts)
+		result, err := psCmd.Run(conf)
+
+		if err != nil {
+			return fmt.Errorf("while running %s: %s", operation, err)
+		} else if result.ExitCode != 0 {
+			return fmt.Errorf("command %s exited with a non-zero exit code(%d), stderr: %s, stdout: %s", operation, result.ExitCode, result.StdErr, result.Stdout)
+		}
 	}
 
 	return nil

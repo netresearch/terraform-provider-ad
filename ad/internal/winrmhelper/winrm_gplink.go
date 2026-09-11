@@ -218,48 +218,12 @@ func GetGPLinkFromHost(conf *config.ProviderConf, gpoGUID, containerGUID string)
 	if len(gplinks) == 0 {
 		return nil, fmt.Errorf("did not find any GPOs linked to GPO %q", containerGUID)
 	}
-	gpoFound := false
-	gpoOrder := -1
-	enforced := false
-	enabled := false
-	ouDN := ""
-	for _, gplink := range gplinks {
-		if gplink[0] == gpoGUID {
-			gpoFound = true
-			order, err := strconv.Atoi(gplink[1])
-			if err != nil {
-				return nil, fmt.Errorf("GetGPLinkFromHost: error while parsing %q as integer: %s", gplink[1], err)
-			}
-			gpoOrder = order
-			switch gplink[2] {
-			case "0":
-				enforced = false
-				enabled = true
-			case "1":
-				enforced = false
-				enabled = false
-			case "2":
-				enforced = true
-				enabled = true
-			case "3":
-				enforced = true
-				enabled = false
-			}
-			ouDN = gplink[3]
-			break
-		}
+	gpo, err := findGPLink(gplinks, gpoGUID)
+	if err != nil {
+		return nil, err
 	}
-
-	if !gpoFound {
+	if gpo == nil {
 		return nil, fmt.Errorf("did not find any GPOs with ID %q attached to container %q", gpoGUID, containerGUID)
-	}
-
-	gpo := &GPLink{
-		GPOGuid:  gpoGUID,
-		Order:    gpoOrder,
-		Target:   ouDN,
-		Enforced: enforced,
-		Enabled:  enabled,
 	}
 
 	return gpo, nil
@@ -276,6 +240,49 @@ func unmarshallNewGPLink(input []byte) (*GPLink, error) {
 		return nil, fmt.Errorf("invalid data while unmarshalling GPLink data, json doc was: %s", string(input))
 	}
 	return gplink, nil
+}
+
+// findGPLink picks the link for gpoGUID out of a parsed gPLink list and returns
+// nil when the GPO is not linked to that container. Each entry is
+// [GUID, order, options, containerDN].
+//
+// The GUID comparison is case-insensitive: Active Directory returns GUIDs in
+// whichever casing it stored them, so a case-sensitive compare intermittently
+// fails to find a link that is plainly there, and the resource then reports the
+// GPO as unlinked.
+func findGPLink(gplinks [][]string, gpoGUID string) (*GPLink, error) {
+	for _, gplink := range gplinks {
+		if !strings.EqualFold(gplink[0], gpoGUID) {
+			continue
+		}
+
+		order, err := strconv.Atoi(gplink[1])
+		if err != nil {
+			return nil, fmt.Errorf("GetGPLinkFromHost: error while parsing %q as integer: %s", gplink[1], err)
+		}
+
+		var enforced, enabled bool
+		switch gplink[2] {
+		case "0":
+			enforced, enabled = false, true
+		case "1":
+			enforced, enabled = false, false
+		case "2":
+			enforced, enabled = true, true
+		case "3":
+			enforced, enabled = true, false
+		}
+
+		return &GPLink{
+			GPOGuid:  gpoGUID,
+			Order:    order,
+			Target:   gplink[3],
+			Enforced: enforced,
+			Enabled:  enabled,
+		}, nil
+	}
+
+	return nil, nil
 }
 
 func getGPLinksFromADObject(input []byte) ([][]string, error) {

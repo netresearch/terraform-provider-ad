@@ -119,6 +119,42 @@ func SetMachineExtensionNames(conf *config.ProviderConf, gpoDN, value string) er
 	return nil
 }
 
+// PSHashtableEntry formats one `key=value` pair of a PowerShell hashtable
+// literal. The key is single-quoted because PowerShell parses a bare hyphenated
+// key such as ms-DS-ConsistencyGuid as an arithmetic expression, and AD
+// attribute names are routinely hyphenated. The value is passed through
+// unchanged, already quoted by the caller.
+//
+// Every hashtable this package builds goes through here, so the three call sites
+// cannot drift apart again — they had, and only one of them quoted its key.
+func PSHashtableEntry(key, value string) string {
+	// SanitiseString does not touch apostrophes, and an apostrophe would close
+	// the single-quoted literal early. PowerShell escapes one by doubling it.
+	escapedKey := strings.ReplaceAll(SanitiseString(key), "'", "''")
+	return fmt.Sprintf("'%s'=%s", escapedKey, value)
+}
+
+// PSHashtableValue renders a value taken from a SortInnerSlice map for use in a
+// PowerShell hashtable.
+//
+// Those values have ALREADY been through GetString, which returns them quoted,
+// so they are passed through rather than quoted again. Quoting here a second
+// time produces `""Chief""`, which makes the Set-ADUser hashtable invalid — the
+// -Replace branch did exactly that, and the -Add branch, which looked
+// inconsistent beside it, was the correct one.
+func PSHashtableValue(v any) string {
+	switch typed := v.(type) {
+	case []string:
+		return strings.Join(typed, ",")
+	case string:
+		return typed
+	default:
+		// SortInnerSlice only ever produces string and []string. Anything else
+		// is a programming error; format it rather than panic.
+		return GetString(v)
+	}
+}
+
 func GetString(v any) string {
 	var out string
 	kind := reflect.ValueOf(v).Kind()
@@ -126,7 +162,9 @@ func GetString(v any) string {
 	case reflect.String:
 		out = SanitiseString(v.(string))
 	case reflect.Float64:
-		out = strconv.FormatFloat(v.(float64), 'E', -1, 64)
+		// 'f' rather than 'E': Active Directory stores what we send verbatim, so
+		// scientific notation would write a numeric attribute as "1E+06".
+		out = strconv.FormatFloat(v.(float64), 'f', -1, 64)
 	case reflect.Int64:
 		out = strconv.FormatInt(v.(int64), 10)
 	case reflect.Bool:
