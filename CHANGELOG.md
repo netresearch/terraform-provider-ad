@@ -3,6 +3,13 @@
 FEATURES:
 * **Resource**: `ad_user`: new write-only argument `initial_password_wo`, with the companion counter `initial_password_wo_version`. Terraform never writes a write-only value to state or to the plan file, so the Active Directory password is kept out of both — which `Sensitive` alone cannot do. Requires Terraform 1.11 or later. Existing configurations are unaffected: `initial_password` keeps working exactly as before, on every Terraform version.
 
+BUGFIXES:
+* **Resource**: `ad_user`: numeric `custom_attributes` are written to Active Directory as plain numbers again. They were formatted with `strconv.FormatFloat(…, 'E', …)`, so `1000000` reached the directory as the literal text `1E+06`. ([hashicorp/terraform-provider-ad#173](https://github.com/hashicorp/terraform-provider-ad/pull/173))
+* **Resource**: `ad_user`: a non-string value in `custom_attributes` no longer panics the provider. `getOtherAttributes` asserted every value to `string`, which `custom_attributes` — free-form JSON — readily violates. ([hashicorp/terraform-provider-ad#173](https://github.com/hashicorp/terraform-provider-ad/pull/173))
+* **Resource**: `ad_user`: hyphenated `custom_attributes` names such as `ms-DS-ConsistencyGuid` now survive. PowerShell parses a bare hyphenated hashtable key as an arithmetic expression, and two of the three places that build those hashtables did not quote the key. The third did not quote its values either. All three now share one helper. ([hashicorp/terraform-provider-ad#173](https://github.com/hashicorp/terraform-provider-ad/pull/173))
+* **Resource**: `ad_group_membership`: a deliberately empty group can be expressed again; `MinItems: 1` made it impossible to declare a group with no members. ([hashicorp/terraform-provider-ad#166](https://github.com/hashicorp/terraform-provider-ad/pull/166))
+* **Resource**: `ad_gplink`: GPO GUIDs are compared case-insensitively. Active Directory returns them in whichever casing it stored them, so a linked GPO was intermittently reported as unlinked.
+
 NOTES:
 * **Resource**: `ad_user`: `initial_password` and `initial_password_wo` are mutually exclusive. Using `initial_password` on Terraform 1.11 or later now produces a warning pointing at the write-only alternative; on older clients it stays silent, since the alternative is not available there.
 * **Resource**: `ad_user`: a write-only value produces no diff of its own, so `initial_password_wo_version` is the only signal the provider has that the password changed. Increment it to re-apply.

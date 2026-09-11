@@ -347,7 +347,7 @@ func (u *User) ModifyUser(d *schema.ResourceData, conf *config.ProviderConf) err
 					} else {
 						out = fmt.Sprintf(`"%s"`, newVal.(string))
 					}
-					toReplace = append(toReplace, fmt.Sprintf("%s=%s", SanitiseString(k), out))
+					toReplace = append(toReplace, PSHashtableEntry(k, out))
 				}
 			} else {
 				toClear = append(toClear, SanitiseString(k))
@@ -362,13 +362,13 @@ func (u *User) ModifyUser(d *schema.ResourceData, conf *config.ProviderConf) err
 					for idx, s := range newVal.([]string) {
 						// Using %q here will cause double quotes inside the string to be escaped with \"
 						// which is not desirable in Powershell
-						quotedStrings[idx] = s
+						quotedStrings[idx] = fmt.Sprintf(`"%s"`, s)
 					}
 					out = strings.Join(quotedStrings, ",")
 				} else {
-					out = newVal.(string)
+					out = fmt.Sprintf(`"%s"`, newVal.(string))
 				}
-				toAdd = append(toAdd, fmt.Sprintf("%s=%s", SanitiseString(k), out))
+				toAdd = append(toAdd, PSHashtableEntry(k, out))
 			}
 		}
 
@@ -484,20 +484,22 @@ func (u *User) DeleteUser(conf *config.ProviderConf) error {
 func (u *User) getOtherAttributes() (string, error) {
 	out := []string{}
 	for k, v := range u.CustomAttributes {
-		cleanKey := SanitiseString(k)
 		var cleanValue string
 		if reflect.ValueOf(v).Kind() == reflect.Slice {
 			quotedStrings := make([]string, len(v.([]any)))
 			for idx, s := range v.([]any) {
 				// Using %q here will cause double quotes inside the string to be escaped with \"
 				// which is not desirable in Powershell
-				quotedStrings[idx] = GetString(s.(string))
+				// GetString takes any and formats numbers and booleans itself;
+				// asserting to string here panics on a custom attribute that is
+				// not one, which JSON readily produces.
+				quotedStrings[idx] = GetString(s)
 			}
 			cleanValue = strings.Join(quotedStrings, ",")
 		} else {
-			cleanValue = GetString(v.(string))
+			cleanValue = GetString(v)
 		}
-		out = append(out, fmt.Sprintf(`'%s'=%s`, cleanKey, cleanValue))
+		out = append(out, PSHashtableEntry(k, cleanValue))
 	}
 	finalAttrString := strings.Join(out, ";")
 	return fmt.Sprintf("@{%s}", finalAttrString), nil

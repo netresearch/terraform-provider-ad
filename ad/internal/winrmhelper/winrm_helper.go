@@ -119,6 +119,18 @@ func SetMachineExtensionNames(conf *config.ProviderConf, gpoDN, value string) er
 	return nil
 }
 
+// PSHashtableEntry formats one `key=value` pair of a PowerShell hashtable
+// literal. The key is single-quoted because PowerShell parses a bare hyphenated
+// key such as ms-DS-ConsistencyGuid as an arithmetic expression, and AD
+// attribute names are routinely hyphenated. The value is passed through
+// unchanged, already quoted by the caller.
+//
+// Every hashtable this package builds goes through here, so the three call sites
+// cannot drift apart again — they had, and only one of them quoted its key.
+func PSHashtableEntry(key, value string) string {
+	return fmt.Sprintf("'%s'=%s", SanitiseString(key), value)
+}
+
 func GetString(v any) string {
 	var out string
 	kind := reflect.ValueOf(v).Kind()
@@ -126,7 +138,9 @@ func GetString(v any) string {
 	case reflect.String:
 		out = SanitiseString(v.(string))
 	case reflect.Float64:
-		out = strconv.FormatFloat(v.(float64), 'E', -1, 64)
+		// 'f' rather than 'E': Active Directory stores what we send verbatim, so
+		// scientific notation would write a numeric attribute as "1E+06".
+		out = strconv.FormatFloat(v.(float64), 'f', -1, 64)
 	case reflect.Int64:
 		out = strconv.FormatInt(v.(int64), 10)
 	case reflect.Bool:
