@@ -663,12 +663,23 @@ func unmarshallUser(input []byte, customAttributes []string) (*User, error) {
 	var accountControlMap = map[string]int64{
 		"disabled":               0x00000002,
 		"password_never_expires": 0x00010000,
-		"cannot_change_password": 0x00000040,
 	}
 
 	user.Enabled = !(user.UserAccountControl&accountControlMap["disabled"] != 0)
 	user.PasswordNeverExpires = user.UserAccountControl&accountControlMap["password_never_expires"] != 0
-	user.CannotChangePassword = user.UserAccountControl&accountControlMap["cannot_change_password"] != 0
+
+	// CannotChangePassword is deliberately NOT derived from userAccountControl.
+	// Active Directory implements it as a deny ACE on the Change Password right,
+	// and Microsoft documents PASSWD_CANT_CHANGE (0x40) as a flag that cannot be
+	// set directly and is not reflected in the attribute — so deriving it always
+	// produced false regardless of the account's real setting. Get-ADUser
+	// -properties * returns CannotChangePassword as its own property, and the
+	// User struct has no json tag on that field, so encoding/json already fills
+	// it in case-insensitively. The derivation was overwriting the correct value
+	// with a constant false.
+	//
+	// PasswordNeverExpires above is a genuine userAccountControl bit
+	// (DONT_EXPIRE_PASSWORD, 0x10000) and stays derived.
 
 	if customAttributes == nil {
 		return &user, nil
