@@ -45,6 +45,7 @@ func resourceADUser() *schema.Resource {
 			"initial_password": {
 				Type:        schema.TypeString,
 				Optional:    true,
+				Sensitive:   true,
 				Description: "The user's initial password. This will be set on creation but will *not* be enforced in subsequent plans.",
 			},
 			"container": {

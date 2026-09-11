@@ -32,6 +32,7 @@ func Provider() *schema.Provider {
 			"winrm_password": {
 				Type:        schema.TypeString,
 				Required:    true,
+				Sensitive:   true,
 				DefaultFunc: schema.EnvDefaultFunc("AD_PASSWORD", nil),
 				Description: "The password used to authenticate to the server's WinRM service. (Environment variable: AD_PASSWORD)",
 			},

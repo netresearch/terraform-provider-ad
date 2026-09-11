@@ -172,7 +172,7 @@ provider "ad" {
 ### Required
 
 - `winrm_hostname` (String) The hostname of the server we will use to run powershell scripts over WinRM. (Environment variable: AD_HOSTNAME)
-- `winrm_password` (String) The password used to authenticate to the server's WinRM service. (Environment variable: AD_PASSWORD)
+- `winrm_password` (String, Sensitive) The password used to authenticate to the server's WinRM service. (Environment variable: AD_PASSWORD)
 - `winrm_username` (String) The username used to authenticate to the server's WinRM service. (Environment variable: AD_USER)
 
 ### Optional
