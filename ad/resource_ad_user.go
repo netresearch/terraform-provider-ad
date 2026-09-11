@@ -248,7 +248,7 @@ func resourceADUser() *schema.Resource {
 	}
 }
 
-func suppressJsonDiff(k, old, new string, d *schema.ResourceData) bool {
+func suppressJsonDiff(k, old, newValue string, d *schema.ResourceData) bool {
 
 	oldMap, err := structure.ExpandJsonFromString(old)
 	if err != nil {
@@ -256,7 +256,7 @@ func suppressJsonDiff(k, old, new string, d *schema.ResourceData) bool {
 	}
 	oldSortedMap := winrmhelper.SortInnerSlice(oldMap)
 
-	newMap, err := structure.ExpandJsonFromString(new)
+	newMap, err := structure.ExpandJsonFromString(newValue)
 	if err != nil {
 		return false
 	}

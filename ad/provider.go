@@ -142,8 +142,8 @@ func initProviderConfig(d *schema.ResourceData) (any, error) {
 	return pcfg, nil
 }
 
-func suppressCaseDiff(k, old, new string, d *schema.ResourceData) bool {
+func suppressCaseDiff(k, old, newValue string, d *schema.ResourceData) bool {
 	// k is ignored here, but wee need to include it in the function's
 	// signature in order to match the one defined for DiffSuppressFunc
-	return strings.EqualFold(old, new)
+	return strings.EqualFold(old, newValue)
 }
