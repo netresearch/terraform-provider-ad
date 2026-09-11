@@ -1,8 +1,9 @@
 ## v0.4.1 (netresearch fork, September 11, 2026)
 
 SECURITY:
-* **Resource**: `ad_user`: `initial_password` is now marked `Sensitive` ([GHSA-rj7j-hc27-42gj](https://github.com/netresearch/terraform-provider-ad/security/advisories/GHSA-rj7j-hc27-42gj)). Terraform previously rendered the Active Directory account password in cleartext in `terraform plan` output, which is read wherever plans are surfaced — CI job logs, pull request comments and Terraform Cloud run logs. The value is still stored in cleartext in state and in the JSON plan file, as Terraform does for every attribute; the JSON plan now carries `after_sensitive` so a consumer can tell which values are marked.
-* **Provider**: `winrm_password` is now marked `Sensitive`. Provider configuration is not part of plan output, so this changes no rendering today — it is the correct declaration for a credential and covers `TF_LOG` and the JSON plan's `configuration` block.
+* **Resource**: `ad_user`: `initial_password` is now marked `Sensitive` ([GHSA-rj7j-hc27-42gj](https://github.com/netresearch/terraform-provider-ad/security/advisories/GHSA-rj7j-hc27-42gj)). Terraform previously rendered the Active Directory account password in cleartext in `terraform plan` output, which is read wherever plans are surfaced — CI job logs, pull request comments and Terraform Cloud run logs. The value is still stored in cleartext in state and in the JSON plan file, as Terraform does for every attribute; the JSON plan now carries `after_sensitive` so a consumer can tell which values are marked. ([#27](https://github.com/netresearch/terraform-provider-ad/pull/27))
+* **Provider**: `winrm_password` is now marked `Sensitive`. Provider configuration is not part of plan output, so this changes no rendering today — it is the correct declaration for a credential and covers `TF_LOG` and the JSON plan's `configuration` block. ([#27](https://github.com/netresearch/terraform-provider-ad/pull/27))
+* **CI**: release notes are generated from the current version's CHANGELOG section again; the quit pattern had not matched this fork's headings, so every release body carried the complete history. ([#27](https://github.com/netresearch/terraform-provider-ad/pull/27))
 
 ## v0.4.0 (netresearch fork, August 26, 2026)
 
