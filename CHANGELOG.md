@@ -1,3 +1,12 @@
+## v0.5.0 (netresearch fork, unreleased)
+
+FEATURES:
+* **Resource**: `ad_user`: new write-only argument `initial_password_wo`, with the companion counter `initial_password_wo_version`. Terraform never writes a write-only value to state or to the plan file, so the Active Directory password is kept out of both — which `Sensitive` alone cannot do. Requires Terraform 1.11 or later. Existing configurations are unaffected: `initial_password` keeps working exactly as before, on every Terraform version.
+
+NOTES:
+* **Resource**: `ad_user`: `initial_password` and `initial_password_wo` are mutually exclusive. Using `initial_password` on Terraform 1.11 or later now produces a warning pointing at the write-only alternative; on older clients it stays silent, since the alternative is not available there.
+* **Resource**: `ad_user`: a write-only value produces no diff of its own, so `initial_password_wo_version` is the only signal the provider has that the password changed. Increment it to re-apply.
+
 ## v0.4.1 (netresearch fork, September 11, 2026)
 
 SECURITY:

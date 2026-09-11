@@ -7,6 +7,7 @@ import (
 	"reflect"
 	"strings"
 
+	"github.com/hashicorp/go-cty/cty"
 	"github.com/hashicorp/terraform-provider-ad/ad/internal/config"
 
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/structure"
@@ -407,7 +408,9 @@ func (u *User) ModifyUser(d *schema.ResourceData, conf *config.ProviderConf) err
 		}
 	}
 
-	if d.HasChange("initial_password") {
+	// A write-only value is null in state, so it can never produce a diff of its
+	// own — initial_password_wo_version is the only signal that it changed.
+	if d.HasChange("initial_password") || d.HasChange("initial_password_wo_version") {
 		cmd := fmt.Sprintf("Set-ADAccountPassword -Identity %q -Reset -NewPassword (ConvertTo-SecureString -AsPlainText %q -Force)", u.GUID, u.Password)
 		psOpts := CreatePSCommandOpts{
 			JSONOutput:      false,
@@ -500,15 +503,46 @@ func (u *User) getOtherAttributes() (string, error) {
 	return fmt.Sprintf("@{%s}", finalAttrString), nil
 }
 
+// GetInitialPassword returns the password to apply to the user, taking it from
+// initial_password_wo when that write-only argument is set and from
+// initial_password otherwise. The two are mutually exclusive in the schema.
+//
+// A write-only value never reaches state, so d.Get returns nothing for it and it
+// has to be read from the raw configuration. That configuration is only populated
+// during plan and apply; on a refresh the value is absent, which is correct —
+// there is nothing to apply then.
+func GetInitialPassword(d *schema.ResourceData) (string, error) {
+	woVal, diags := d.GetRawConfigAt(cty.GetAttrPath("initial_password_wo"))
+	if diags.HasError() {
+		// The attribute is absent from the raw config, which is the normal case
+		// during a refresh. Fall back to the regular attribute.
+		return SanitiseTFInput(d, "initial_password"), nil
+	}
+
+	if !woVal.IsNull() && woVal.IsKnown() {
+		if woVal.Type() != cty.String {
+			return "", fmt.Errorf("initial_password_wo has unexpected type %s, expected string", woVal.Type().FriendlyName())
+		}
+		return SanitiseString(woVal.AsString()), nil
+	}
+
+	return SanitiseTFInput(d, "initial_password"), nil
+}
+
 // GetUserFromResource returns a user struct built from Resource data
 func GetUserFromResource(d *schema.ResourceData) (*User, error) {
+	password, err := GetInitialPassword(d)
+	if err != nil {
+		return nil, err
+	}
+
 	user := User{
 		GUID:                   d.Id(),
 		SAMAccountName:         SanitiseTFInput(d, "sam_account_name"),
 		PrincipalName:          SanitiseTFInput(d, "principal_name"),
 		DisplayName:            SanitiseTFInput(d, "display_name"),
 		Container:              SanitiseTFInput(d, "container"),
-		Password:               SanitiseTFInput(d, "initial_password"),
+		Password:               password,
 		Enabled:                d.Get("enabled").(bool),
 		PasswordNeverExpires:   d.Get("password_never_expires").(bool),
 		CannotChangePassword:   d.Get("cannot_change_password").(bool),

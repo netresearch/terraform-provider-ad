@@ -82,6 +82,8 @@ resource "ad_user" "u2" {
 
 ### Optional
 
+> **NOTE**: [Write-only arguments](https://developer.hashicorp.com/terraform/language/resources/ephemeral#write-only-arguments) are supported in Terraform 1.11 and later.
+
 - `cannot_change_password` (Boolean) If set to true, the user will not be allowed to change their password.
 - `city` (String) Specifies the user's town or city. This parameter sets the City property of a user object.
 - `company` (String) Specifies the user's company. This parameter sets the Company property of a user object.
@@ -101,7 +103,9 @@ resource "ad_user" "u2" {
 - `home_drive` (String) Specifies a drive that is associated with the UNC path defined by the HomeDirectory property. The drive letter is specified as <DriveLetter>: where <DriveLetter> indicates the letter of the drive to associate. The <DriveLetter> must be a single, uppercase letter and the colon is required. This parameter sets the HomeDrive property of the user object.
 - `home_page` (String) Specifies the URL of the home page of the object. This parameter sets the homePage property of a user object.
 - `home_phone` (String) Specifies the user's home telephone number. This parameter sets the HomePhone property of a user object.
-- `initial_password` (String, Sensitive) The user's initial password. This will be set on creation but will *not* be enforced in subsequent plans.
+- `initial_password` (String, Sensitive) The user's initial password. This will be set on creation but will *not* be enforced in subsequent plans. The value is written to state in cleartext; prefer `initial_password_wo`, which is not.
+- `initial_password_wo` (String, [Write-only](https://developer.hashicorp.com/terraform/language/resources/ephemeral#write-only-arguments)) The user's initial password, as a write-only argument. The value is never written to state or to the plan file. Requires Terraform 1.11 or later. Set `initial_password_wo_version` alongside it and increment that value to apply a new password, since a write-only value produces no diff of its own.
+- `initial_password_wo_version` (Number) Version counter for `initial_password_wo`. Increment it to make the provider re-apply the write-only password. It is the only signal the provider has that the password changed.
 - `initials` (String) Specifies the initials that represent part of a user's name. Maximum 6 char.
 - `mobile_phone` (String) Specifies the user's mobile phone number. This parameter sets the MobilePhone property of a user object.
 - `office` (String) Specifies the location of the user's office or place of business. This parameter sets the Office property of a user object.

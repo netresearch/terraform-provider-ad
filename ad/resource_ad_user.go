@@ -7,6 +7,7 @@ import (
 	"reflect"
 	"strings"
 
+	"github.com/hashicorp/go-cty/cty"
 	"github.com/hashicorp/terraform-provider-ad/ad/internal/config"
 
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/structure"
@@ -26,6 +27,15 @@ func resourceADUser() *schema.Resource {
 		Importer: &schema.ResourceImporter{
 			StateContext: schema.ImportStatePassthroughContext,
 		},
+		ValidateRawResourceConfigFuncs: []schema.ValidateRawResourceConfigFunc{
+			// Warns when initial_password is used on a client that supports
+			// write-only attributes. Silent on Terraform below 1.11, where the
+			// alternative is not available.
+			validation.PreferWriteOnlyAttribute(
+				cty.GetAttrPath("initial_password"),
+				cty.GetAttrPath("initial_password_wo"),
+			),
+		},
 		Schema: map[string]*schema.Schema{
 			"display_name": {
 				Type:        schema.TypeString,
@@ -43,10 +53,25 @@ func resourceADUser() *schema.Resource {
 				Description: "The pre-win2k user logon name.",
 			},
 			"initial_password": {
-				Type:        schema.TypeString,
-				Optional:    true,
-				Sensitive:   true,
-				Description: "The user's initial password. This will be set on creation but will *not* be enforced in subsequent plans.",
+				Type:          schema.TypeString,
+				Optional:      true,
+				Sensitive:     true,
+				ConflictsWith: []string{"initial_password_wo"},
+				Description:   "The user's initial password. This will be set on creation but will *not* be enforced in subsequent plans. The value is written to state in cleartext; prefer `initial_password_wo`, which is not.",
+			},
+			"initial_password_wo": {
+				Type:          schema.TypeString,
+				Optional:      true,
+				WriteOnly:     true,
+				ConflictsWith: []string{"initial_password"},
+				RequiredWith:  []string{"initial_password_wo_version"},
+				Description:   "The user's initial password, as a write-only argument. The value is never written to state or to the plan file. Requires Terraform 1.11 or later. Set `initial_password_wo_version` alongside it and increment that value to apply a new password, since a write-only value produces no diff of its own.",
+			},
+			"initial_password_wo_version": {
+				Type:         schema.TypeInt,
+				Optional:     true,
+				RequiredWith: []string{"initial_password_wo"},
+				Description:  "Version counter for `initial_password_wo`. Increment it to make the provider re-apply the write-only password. It is the only signal the provider has that the password changed.",
 			},
 			"container": {
 				Type:             schema.TypeString,
