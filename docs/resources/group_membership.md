@@ -61,13 +61,15 @@ resource ad_group_membership "gm" {
 - `group_id` (String) The ID of the group. This can be a GUID, a SID, a Distinguished Name, or the SAM Account Name of the group.
 - `group_members` (Set of String) A list of member AD Principals. Each principal can be identified by its GUID, SID, Distinguished Name, or SAM Account Name. Only one is required
 
-### Optional
+### Read-Only
 
 - `id` (String) The ID of this resource.
 
 ## Import
 
 Import is supported using the following syntax:
+
+The [`terraform import` command](https://developer.hashicorp.com/terraform/cli/commands/import) can be used, for example:
 
 ```shell
 # The ID for this resource is the group's UUID plus a random UUID joined 

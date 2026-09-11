@@ -10,7 +10,7 @@
 
 What this fork changes on top of upstream:
 
-- **Fixes UTF-16 / unicode encoding issues** — from upstream [PR #190](https://github.com/hashicorp/terraform-provider-ad/pull/190) by @sthetz, which was never merged upstream and, now that the repository is archived, never will be.
+- **Fixes UTF-16 / unicode encoding issues** — from upstream [PR #190](https://github.com/hashicorp/terraform-provider-ad/pull/190) by [@sthetz](https://github.com/sthetz), which was never merged upstream and, now that the repository is archived, never will be.
 - **Adds `username` to the `ad_user` data source**, equivalent to the `-Name` argument.
 - **Unvendors the dependency tree** ([`419b522`](https://github.com/netresearch/terraform-provider-ad/commit/419b5226deda2c227074ca63e28dfbf72986ed72)) and keeps dependencies current, including security updates that upstream stopped receiving.
 - **Releases from our own pipeline** — upstream released through HashiCorp-internal infrastructure that a fork cannot use.

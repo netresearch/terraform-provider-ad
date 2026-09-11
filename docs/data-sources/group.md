@@ -41,10 +41,6 @@ output "g2_description" {
 
 - `group_id` (String) The group's identifier. It can be the group's GUID, SID, Distinguished Name, or SAM Account Name.
 
-### Optional
-
-- `id` (String) The ID of this resource.
-
 ### Read-Only
 
 - `category` (String) The Group's category.
@@ -52,9 +48,8 @@ output "g2_description" {
 - `description` (String) Description of the Group object.
 - `display_name` (String) The display name of the Group object.
 - `dn` (String) The distinguished name of the group object.
+- `id` (String) The ID of this resource.
 - `name` (String) The name of the Group object.
 - `sam_account_name` (String) The SAM account name of the Group object.
 - `scope` (String) The Group's scope.
 - `sid` (String) The SID of the group object.
-
-

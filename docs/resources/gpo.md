@@ -33,17 +33,19 @@ resource "ad_gpo" "gpo" {
 
 - `description` (String) Description of the GPO.
 - `domain` (String) Domain of the GPO.
-- `id` (String) The ID of this resource.
 - `status` (String) Status of the GPO. Can be one of `AllSettingsEnabled`, `UserSettingsDisabled`, `ComputerSettingsDisabled`, or `AllSettingsDisabled` (case sensitive).
 
 ### Read-Only
 
 - `dn` (String)
+- `id` (String) The ID of this resource.
 - `numeric_status` (Number)
 
 ## Import
 
 Import is supported using the following syntax:
+
+The [`terraform import` command](https://developer.hashicorp.com/terraform/cli/commands/import) can be used, for example:
 
 ```shell
 $ terraform import ad_gpo 9CB8219C-31FF-4A85-A7A3-9BCBB6A41D02

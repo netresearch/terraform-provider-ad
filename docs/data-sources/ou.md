@@ -28,7 +28,6 @@ output "ou_uuid" {
 ### Optional
 
 - `dn` (String, Deprecated) Distinguished Name of the OU object.
-- `id` (String) The ID of this resource.
 - `name` (String) Name of the OU object. If this is used then the `path` attribute needs to be set as well.
 - `ou_id` (String) The OU's identifier. It can be the OU's GUID, SID, Distinguished Name, or SAM Account Name.
 - `path` (String) Path of the OU object. If this is used then the `Name` attribute needs to be set as well.
@@ -36,6 +35,5 @@ output "ou_uuid" {
 ### Read-Only
 
 - `description` (String) The OU's description.
+- `id` (String) The ID of this resource.
 - `protected` (String) The OU's protected status.
-
-
