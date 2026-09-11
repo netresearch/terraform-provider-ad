@@ -10,6 +10,7 @@ BUGFIXES:
 * **Resource**: `ad_group_membership`: a deliberately empty group can be expressed again; `MinItems: 1` made it impossible to declare a group with no members. ([hashicorp/terraform-provider-ad#166](https://github.com/hashicorp/terraform-provider-ad/pull/166))
 * **Resource**: `ad_gplink`: GPO GUIDs are compared case-insensitively. Active Directory returns them in whichever casing it stored them, so a linked GPO was intermittently reported as unlinked.
 * **Resource**: `ad_group_membership`: membership changes are split across several `Add-`/`Remove-ADGroupMember` calls instead of one unbounded command, which overran the 8191-character Windows command-line limit on larger groups. The split is by rendered length rather than by member count, since a distinguished name is an order of magnitude longer than a GUID.
+* **Resource**: `ad_gpo_security`: a `registry_values` line with fewer than three comma-separated fields no longer panics the provider. The three fields were read positionally with no length check, while the identical access in `registry_keys` was already guarded.
 * **Resource**: `ad_user`: `cannot_change_password` reports the account's real setting. It was derived from `userAccountControl` bit `0x40`, which Active Directory does not use for this — the setting is a deny ACE on the Change Password right — so the attribute read `false` for every account. `Get-ADUser` already returns the correct value and the derivation was overwriting it.
 
 NOTES:

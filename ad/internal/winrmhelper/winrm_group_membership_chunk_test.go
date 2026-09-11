@@ -37,27 +37,40 @@ func TestChunkMembersRespectsBudget(t *testing.T) {
 			all := members(c.n, c.id)
 			chunks := chunkMembers(all, maxMemberListLength)
 
-			seen := 0
-			for i, chunk := range chunks {
-				if len(chunk) == 0 {
-					t.Fatalf("chunk %d is empty", i)
-				}
-				seen += len(chunk)
+			assertChunksWithinBudget(t, chunks)
 
-				rendered := getMembershipList(chunk)
-				// A chunk may exceed the budget only when it holds a single
-				// member that is itself over budget.
-				if len(rendered) > maxMemberListLength && len(chunk) > 1 {
-					t.Errorf("chunk %d renders %d characters, over the %d budget, with %d members",
-						i, len(rendered), maxMemberListLength, len(chunk))
-				}
-			}
-
-			if seen != c.n {
+			if seen := countMembers(chunks); seen != c.n {
 				t.Errorf("chunks hold %d members, want all %d — chunking must not drop anyone", seen, c.n)
 			}
 		})
 	}
+}
+
+// assertChunksWithinBudget checks every chunk renders inside the budget. A chunk
+// may exceed it only when it holds a single member that is itself over budget,
+// which chunkMembers emits rather than dropping.
+func assertChunksWithinBudget(t *testing.T, chunks [][]*GroupMember) {
+	t.Helper()
+
+	for i, chunk := range chunks {
+		if len(chunk) == 0 {
+			t.Fatalf("chunk %d is empty", i)
+		}
+
+		rendered := len(getMembershipList(chunk))
+		if rendered > maxMemberListLength && len(chunk) > 1 {
+			t.Errorf("chunk %d renders %d characters, over the %d budget, with %d members",
+				i, rendered, maxMemberListLength, len(chunk))
+		}
+	}
+}
+
+func countMembers(chunks [][]*GroupMember) int {
+	n := 0
+	for _, chunk := range chunks {
+		n += len(chunk)
+	}
+	return n
 }
 
 // TestChunkMembersPreservesOrderAndIdentity guards against a chunker that keeps

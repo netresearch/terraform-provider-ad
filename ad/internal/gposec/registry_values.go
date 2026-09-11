@@ -19,6 +19,14 @@ func (r *RegistryValues) SetResourceData(section string, d *schema.ResourceData)
 	out := []map[string]any{}
 	for _, valuesLine := range r.Values {
 		values := strings.SplitN(valuesLine, ",", 3)
+
+		// Without this the indexing below panics on any line the directory
+		// returns with fewer than three fields. RegistryKeys.SetResourceData
+		// already guards its identical access; this one did not.
+		if len(values) != 3 {
+			return fmt.Errorf("invalid registry values line: %s", valuesLine)
+		}
+
 		value := map[string]any{
 			"key_name":   values[0],
 			"value_type": values[1],

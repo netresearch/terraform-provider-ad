@@ -46,6 +46,47 @@ func TestRegistryValuesSetResourceData(t *testing.T) {
 	}
 }
 
+// TestRegistryValuesSetResourceDataRejectsShortLines guards an index out of
+// range panic. The three fields are read positionally out of a comma-separated
+// line the directory produced, with no check that all three are there, so a
+// short line took the whole provider down. RegistryKeys.SetResourceData
+// performs the identical access and has always carried the length check.
+func TestRegistryValuesSetResourceDataRejectsShortLines(t *testing.T) {
+	for _, c := range []struct {
+		name    string
+		line    string
+		wantErr bool
+	}{
+		{"well-formed line", `HKLM\Some\Key,2,keyvalue`, false},
+		{"value containing commas", `HKLM\Some\Key,7,a,b,c`, false},
+		{"two fields", `HKLM\Some\Key,2`, true},
+		{"one field", `HKLM\Some\Key`, true},
+		{"empty line", ``, true},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			defer func() {
+				if r := recover(); r != nil {
+					t.Fatalf("panicked on %q: %v", c.line, r)
+				}
+			}()
+
+			r := schema.Resource{}
+			r.Schema = adschema.GpoSecuritySchema()
+			d := r.TestResourceData()
+
+			rv := RegistryValues{Values: []string{c.line}}
+			err := rv.SetResourceData("registry_values", d)
+
+			if c.wantErr && err == nil {
+				t.Errorf("line %q was accepted; a short line must be an error, not a panic", c.line)
+			}
+			if !c.wantErr && err != nil {
+				t.Errorf("line %q was rejected: %v", c.line, err)
+			}
+		})
+	}
+}
+
 func newRVFromResource() (*RegistryValues, error) {
 	r := schema.Resource{}
 	r.Schema = adschema.GpoSecuritySchema()
