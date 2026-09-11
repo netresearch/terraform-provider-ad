@@ -26,7 +26,12 @@ jobs:
           cache: true
 
       - name: Generate Release Notes
-        run: sed -n -e "1{/# /d;}" -e "2{/^$/d;}" -e "/# $(git describe --abbrev=0 --exclude="$(git describe --abbrev=0 --match='v*.*.*' --tags)" --match='v*.*.*' --tags | tr -d v)/q;p" CHANGELOG.md > /tmp/release-notes.txt
+        # The quit pattern must match the PREVIOUS version's CHANGELOG heading.
+        # Upstream stripped the leading "v" because its headings read "## 0.5.0";
+        # every netresearch heading reads "## v0.4.0 (netresearch fork, ...)", so
+        # the stripped pattern never matched and the notes ran to the end of the
+        # file, carrying the whole upstream history into the release.
+        run: sed -n -e "1{/# /d;}" -e "2{/^$/d;}" -e "/# $(git describe --abbrev=0 --exclude="$(git describe --abbrev=0 --match='v*.*.*' --tags)" --match='v*.*.*' --tags)/q;p" CHANGELOG.md > /tmp/release-notes.txt
 
       - name: Import GPG key
         uses: crazy-max/ghaction-import-gpg@2dc316deee8e90f13e1a351ab510b4d5bc0c82cd # v7.0.0
