@@ -5,6 +5,9 @@ SECURITY:
 * **Provider**: `winrm_password` is now marked `Sensitive`. Provider configuration is not part of plan output, so this changes no rendering today — it is the correct declaration for a credential and covers `TF_LOG` and the JSON plan's `configuration` block. ([#27](https://github.com/netresearch/terraform-provider-ad/pull/27))
 * **CI**: release notes are generated from the current version's CHANGELOG section again; the quit pattern had not matched this fork's headings, so every release body carried the complete history. ([#27](https://github.com/netresearch/terraform-provider-ad/pull/27))
 
+THANKS:
+* @kta1kri reported the `initial_password` disclosure privately through a GitHub security advisory, with a complete write-up: the affected declaration, the consumer that proves the value is the real password, a credential-free reproduction, and the scope they had already ruled out. Both of their exclusions held up when we checked them. Reported and held privately throughout.
+
 ## v0.4.0 (netresearch fork, August 26, 2026)
 
 * dependencies: CI and release builds now use Go 1.27.0 (`.go-version`); the `go` directive stays at 1.25.8 ([#22](https://github.com/netresearch/terraform-provider-ad/pull/22))
