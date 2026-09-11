@@ -1,6 +1,7 @@
 package ad
 
 import (
+	"slices"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
@@ -44,62 +45,61 @@ func TestWriteOnlyPasswordAttribute(t *testing.T) {
 		t.Fatal("resource ad_user is not registered")
 	}
 
-	wo, ok := r.Schema["initial_password_wo"]
-	if !ok {
-		t.Fatal("attribute initial_password_wo does not exist")
+	wo := mustAttr(t, r.Schema, "initial_password_wo")
+	version := mustAttr(t, r.Schema, "initial_password_wo_version")
+	old := mustAttr(t, r.Schema, "initial_password")
+
+	for _, c := range []schemaCheck{
+		{
+			"is write-only",
+			func() bool { return wo.WriteOnly },
+			"initial_password_wo must be WriteOnly, otherwise the password is written to state",
+		},
+		{
+			// Either would mean a value the practitioner never wrote gets applied.
+			"is not computed",
+			func() bool { return !wo.Computed },
+			"initial_password_wo must not be Computed",
+		},
+		{
+			"carries no default",
+			func() bool { return wo.Default == nil && wo.DefaultFunc == nil },
+			"initial_password_wo must not carry a default",
+		},
+		{
+			"requires its version companion",
+			func() bool { return slices.Contains(wo.RequiredWith, "initial_password_wo_version") },
+			"initial_password_wo must require initial_password_wo_version; without it no password change can ever be detected",
+		},
+		{
+			"version companion requires it back",
+			func() bool { return slices.Contains(version.RequiredWith, "initial_password_wo") },
+			"initial_password_wo_version must require initial_password_wo",
+		},
+		{
+			"excludes initial_password",
+			func() bool { return slices.Contains(wo.ConflictsWith, "initial_password") },
+			"initial_password_wo must conflict with initial_password",
+		},
+		{
+			"is excluded by initial_password",
+			func() bool { return slices.Contains(old.ConflictsWith, "initial_password_wo") },
+			"initial_password must conflict with initial_password_wo",
+		},
+		{
+			// The version is the only diff the provider can see for a write-only
+			// password, so it has to persist.
+			"version attribute is visible in state",
+			func() bool { return !version.WriteOnly },
+			"initial_password_wo_version must not be WriteOnly; it is the change signal and has to persist",
+		},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			if !c.holds() {
+				t.Error(c.msg)
+			}
+		})
 	}
-	version, ok := r.Schema["initial_password_wo_version"]
-	if !ok {
-		t.Fatal("attribute initial_password_wo_version does not exist")
-	}
-	old, ok := r.Schema["initial_password"]
-	if !ok {
-		t.Fatal("attribute initial_password does not exist")
-	}
-
-	t.Run("is write-only", func(t *testing.T) {
-		if !wo.WriteOnly {
-			t.Error("initial_password_wo must be WriteOnly, otherwise the password is written to state")
-		}
-	})
-
-	// A WriteOnly attribute must never be Computed and must never carry a default:
-	// the SDK rejects both, and either would mean a value the practitioner did not
-	// write ends up being applied.
-	t.Run("carries no computed value or default", func(t *testing.T) {
-		if wo.Computed {
-			t.Error("initial_password_wo must not be Computed")
-		}
-		if wo.Default != nil || wo.DefaultFunc != nil {
-			t.Error("initial_password_wo must not carry a default")
-		}
-	})
-
-	t.Run("requires its version companion", func(t *testing.T) {
-		if !contains(wo.RequiredWith, "initial_password_wo_version") {
-			t.Error("initial_password_wo must require initial_password_wo_version; without it no password change can ever be detected")
-		}
-		if !contains(version.RequiredWith, "initial_password_wo") {
-			t.Error("initial_password_wo_version must require initial_password_wo")
-		}
-	})
-
-	t.Run("is mutually exclusive with initial_password", func(t *testing.T) {
-		if !contains(wo.ConflictsWith, "initial_password") {
-			t.Error("initial_password_wo must conflict with initial_password")
-		}
-		if !contains(old.ConflictsWith, "initial_password_wo") {
-			t.Error("initial_password must conflict with initial_password_wo")
-		}
-	})
-
-	// The version attribute is the only diff the provider can see for a write-only
-	// password, so it must not be write-only itself.
-	t.Run("version attribute is visible in state", func(t *testing.T) {
-		if version.WriteOnly {
-			t.Error("initial_password_wo_version must not be WriteOnly; it is the change signal and has to persist")
-		}
-	})
 
 	t.Run("resource schema is valid", func(t *testing.T) {
 		if err := r.InternalValidate(nil, true); err != nil {
@@ -108,13 +108,22 @@ func TestWriteOnlyPasswordAttribute(t *testing.T) {
 	})
 }
 
-func contains(haystack []string, needle string) bool {
-	for _, s := range haystack {
-		if s == needle {
-			return true
-		}
+// schemaCheck is one named invariant of the schema plus the message explaining
+// what breaks when it stops holding.
+type schemaCheck struct {
+	name  string
+	holds func() bool
+	msg   string
+}
+
+func mustAttr(t *testing.T, s map[string]*schema.Schema, name string) *schema.Schema {
+	t.Helper()
+
+	attr, ok := s[name]
+	if !ok {
+		t.Fatalf("attribute %q does not exist", name)
 	}
-	return false
+	return attr
 }
 
 func assertSensitive(t *testing.T, s map[string]*schema.Schema, name string) {
