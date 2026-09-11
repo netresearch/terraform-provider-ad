@@ -47,12 +47,17 @@ resource "ad_gplink" "og" {
 
 - `enabled` (Boolean) Controls the state of the GP link between a GPO and a container object.
 - `enforced` (Boolean) If set to true, the GPO will be enforced on the container object.
-- `id` (String) The ID of this resource.
 - `order` (Number) Sets the precedence between multiple GPOs linked to the same container object.
+
+### Read-Only
+
+- `id` (String) The ID of this resource.
 
 ## Import
 
 Import is supported using the following syntax:
+
+The [`terraform import` command](https://developer.hashicorp.com/terraform/cli/commands/import) can be used, for example:
 
 ```shell
 # The ID for this resource is comprised of the GPO GUID and the container (OU) GUID separated by 

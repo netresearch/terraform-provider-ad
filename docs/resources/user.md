@@ -101,7 +101,6 @@ resource "ad_user" "u2" {
 - `home_drive` (String) Specifies a drive that is associated with the UNC path defined by the HomeDirectory property. The drive letter is specified as <DriveLetter>: where <DriveLetter> indicates the letter of the drive to associate. The <DriveLetter> must be a single, uppercase letter and the colon is required. This parameter sets the HomeDrive property of the user object.
 - `home_page` (String) Specifies the URL of the home page of the object. This parameter sets the homePage property of a user object.
 - `home_phone` (String) Specifies the user's home telephone number. This parameter sets the HomePhone property of a user object.
-- `id` (String) The ID of this resource.
 - `initial_password` (String, Sensitive) The user's initial password. This will be set on creation but will *not* be enforced in subsequent plans.
 - `initials` (String) Specifies the initials that represent part of a user's name. Maximum 6 char.
 - `mobile_phone` (String) Specifies the user's mobile phone number. This parameter sets the MobilePhone property of a user object.
@@ -118,15 +117,19 @@ resource "ad_user" "u2" {
 - `surname` (String) Specifies the user's last name or surname. This parameter sets the Surname property of a user object.
 - `title` (String) Specifies the user's title. This parameter sets the Title property of a user object
 - `trusted_for_delegation` (Boolean) If set to true, the user account is trusted for Kerberos delegation. A service that runs under an account that is trusted for Kerberos delegation can assume the identity of a client requesting the service. This parameter sets the TrustedForDelegation property of an account object.
+- `username` (String) Set a username for the user. This parameter is the equivalent to the -Name parameter of New-ADUser cmdlet.
 
 ### Read-Only
 
 - `dn` (String) The distinguished name of the user object.
+- `id` (String) The ID of this resource.
 - `sid` (String) The SID of the user object.
 
 ## Import
 
 Import is supported using the following syntax:
+
+The [`terraform import` command](https://developer.hashicorp.com/terraform/cli/commands/import) can be used, for example:
 
 ```shell
 $ terraform import ad_user 9CB8219C-31FF-4A85-A7A3-9BCBB6A41D02

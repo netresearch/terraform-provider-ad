@@ -33,18 +33,20 @@ resource "ad_computer" "c" {
 
 - `container` (String) The DN of the container used to hold the computer account.
 - `description` (String) Specifies a description of the object. This parameter sets the value of the Description property for the computer object.
-- `id` (String) The ID of this resource.
 - `pre2kname` (String) The pre-win2k name for the computer account.
 
 ### Read-Only
 
 - `dn` (String)
 - `guid` (String)
+- `id` (String) The ID of this resource.
 - `sid` (String) The SID of the computer object.
 
 ## Import
 
 Import is supported using the following syntax:
+
+The [`terraform import` command](https://developer.hashicorp.com/terraform/cli/commands/import) can be used, for example:
 
 ```shell
 $ terraform import ad_computer 9CB8219C-31FF-4A85-A7A3-9BCBB6A41D02

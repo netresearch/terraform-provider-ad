@@ -31,7 +31,6 @@ resource "ad_ou" "o" {
 ### Optional
 
 - `description` (String) Description of the OU.
-- `id` (String) The ID of this resource.
 - `path` (String) DN of the object that contains the OU.
 - `protected` (Boolean) Protect this OU from being deleted accidentaly.
 
@@ -39,10 +38,13 @@ resource "ad_ou" "o" {
 
 - `dn` (String) The OU's DN.
 - `guid` (String) The OU's GUID.
+- `id` (String) The ID of this resource.
 
 ## Import
 
 Import is supported using the following syntax:
+
+The [`terraform import` command](https://developer.hashicorp.com/terraform/cli/commands/import) can be used, for example:
 
 ```shell
 $ terraform import ad_ou.o 9CB8219C-31FF-4A85-A7A3-9BCBB6A41D02

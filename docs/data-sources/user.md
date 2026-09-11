@@ -45,10 +45,6 @@ output "testuser_guid" {
 
 - `user_id` (String) The user's identifier. It can be the group's GUID, SID, Distinguished Name, or SAM Account Name.
 
-### Optional
-
-- `id` (String) The ID of this resource.
-
 ### Read-Only
 
 - `city` (String) City assigned to user object.
@@ -68,6 +64,7 @@ output "testuser_guid" {
 - `home_drive` (String) Home drive of the user object.
 - `home_page` (String) Home page of the user object.
 - `home_phone` (String) Home phone of the user object.
+- `id` (String) The ID of this resource.
 - `initials` (String) Initials of the user object.
 - `mobile_phone` (String) Mobile phone of the user object.
 - `office` (String) Office assigned to user object.
@@ -85,5 +82,4 @@ output "testuser_guid" {
 - `surname` (String) Surname of the user object.
 - `title` (String) Title of the user object
 - `trusted_for_delegation` (Boolean) Check if user is trusted for delegation
-
-
+- `username` (String) Username of the user object.

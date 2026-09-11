@@ -56,7 +56,6 @@ resource "ad_gpo_security" "gpo_sec" {
 - `audit_log` (Block List, Max: 1) Audit log related settings. (https://docs.microsoft.com/en-us/openspecs/windows_protocols/ms-gpsb/0b9673a7-ce0a-49b4-912b-591efdb37cdf) (see [below for nested schema](#nestedblock--audit_log))
 - `event_audit` (Block List, Max: 1) Event audit related settings. (https://docs.microsoft.com/en-us/openspecs/windows_protocols/ms-gpsb/01f8e057-f6a8-4d6e-8a00-99bcd241b403). Valid values for all items below are: 0 (None), 1 (Success audits only), 2 (Failure audits only), 3 (Success and failure audits), 4 (None) (see [below for nested schema](#nestedblock--event_audit))
 - `filesystem` (Block Set) Settings related to File System permissions. (https://docs.microsoft.com/en-us/openspecs/windows_protocols/ms-gpsb/abeebe06-49aa-44d4-ae5b-d6aff458e8e7) (see [below for nested schema](#nestedblock--filesystem))
-- `id` (String) The ID of this resource.
 - `kerberos_policy` (Block List, Max: 1) Settings related to kerberos policies. (https://docs.microsoft.com/en-us/openspecs/windows_protocols/ms-gpsb/0fce5b92-bcc1-4b96-9c2b-56397c3f144f) (see [below for nested schema](#nestedblock--kerberos_policy))
 - `password_policies` (Block List, Max: 1) Settings related to password policies. (https://docs.microsoft.com/en-us/openspecs/windows_protocols/ms-gpsb/0b40db09-d95d-40a6-8467-32aedec8140c) (see [below for nested schema](#nestedblock--password_policies))
 - `registry_keys` (Block Set) Settings related to Registry Keys. (https://docs.microsoft.com/en-us/openspecs/windows_protocols/ms-gpsb/13712a60-de1e-4642-bd9c-ab054dd86278) (see [below for nested schema](#nestedblock--registry_keys))
@@ -64,6 +63,10 @@ resource "ad_gpo_security" "gpo_sec" {
 - `restricted_groups` (Block Set) Settings related to Groups Membership. (https://docs.microsoft.com/en-us/openspecs/windows_protocols/ms-gpsb/b73d8bae-ed22-48aa-acba-7065ab52d709) (see [below for nested schema](#nestedblock--restricted_groups))
 - `system_log` (Block List, Max: 1) System log related settings. (https://docs.microsoft.com/en-us/openspecs/windows_protocols/ms-gpsb/0b9673a7-ce0a-49b4-912b-591efdb37cdf) (see [below for nested schema](#nestedblock--system_log))
 - `system_services` (Block Set) Settings related to System Services. (https://docs.microsoft.com/en-us/openspecs/windows_protocols/ms-gpsb/32deea3e-3fa4-414b-ba25-4121ad8c055c) (see [below for nested schema](#nestedblock--system_services))
+
+### Read-Only
+
+- `id` (String) The ID of this resource.
 
 <a id="nestedblock--account_lockout"></a>
 ### Nested Schema for `account_lockout`
@@ -202,6 +205,8 @@ Required:
 ## Import
 
 Import is supported using the following syntax:
+
+The [`terraform import` command](https://developer.hashicorp.com/terraform/cli/commands/import) can be used, for example:
 
 ```shell
 $ terraform import ad_gpo_security 9CB8219C-31FF-4A85-A7A3-9BCBB6A41D02_securitysettings

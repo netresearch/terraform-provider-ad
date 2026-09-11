@@ -53,17 +53,19 @@ resource "ad_group" "g" {
 
 - `category` (String) The group's category. Can be one of `distribution` or `security` (case sensitive).
 - `description` (String) Description of the Group.
-- `id` (String) The ID of this resource.
 - `scope` (String) The group's scope. Can be one of `global`, `domainlocal`, or `universal` (case sensitive).
 
 ### Read-Only
 
 - `dn` (String) The distinguished name of the group object.
+- `id` (String) The ID of this resource.
 - `sid` (String) The SID of the group object.
 
 ## Import
 
 Import is supported using the following syntax:
+
+The [`terraform import` command](https://developer.hashicorp.com/terraform/cli/commands/import) can be used, for example:
 
 ```shell
 $ terraform import ad_group 9CB8219C-31FF-4A85-A7A3-9BCBB6A41D02
