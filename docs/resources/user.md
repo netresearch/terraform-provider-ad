@@ -102,7 +102,7 @@ resource "ad_user" "u2" {
 - `home_page` (String) Specifies the URL of the home page of the object. This parameter sets the homePage property of a user object.
 - `home_phone` (String) Specifies the user's home telephone number. This parameter sets the HomePhone property of a user object.
 - `id` (String) The ID of this resource.
-- `initial_password` (String) The user's initial password. This will be set on creation but will *not* be enforced in subsequent plans.
+- `initial_password` (String, Sensitive) The user's initial password. This will be set on creation but will *not* be enforced in subsequent plans.
 - `initials` (String) Specifies the initials that represent part of a user's name. Maximum 6 char.
 - `mobile_phone` (String) Specifies the user's mobile phone number. This parameter sets the MobilePhone property of a user object.
 - `office` (String) Specifies the location of the user's office or place of business. This parameter sets the Office property of a user object.
