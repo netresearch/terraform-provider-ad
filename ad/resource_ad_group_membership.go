@@ -47,11 +47,17 @@ func resourceADGroupMembershipRead(d *schema.ResourceData, meta any) error {
 	if err != nil {
 		return err
 	}
-	memberList := make([]string, len(gm.GroupMembers))
-
-	for idx, m := range gm.GroupMembers {
-		memberList[idx] = m.GUID
+	// Keep the identifier form the configuration uses for members that are still
+	// present. Writing GUIDs unconditionally made every configuration that names
+	// members by SAM account name or distinguished name diff forever.
+	configured := []string{}
+	if raw, ok := d.GetOk("group_members"); ok {
+		for _, m := range raw.(*schema.Set).List() {
+			configured = append(configured, m.(string))
+		}
 	}
+
+	memberList := winrmhelper.ReconcileMemberIdentifiers(gm.GroupMembers, configured)
 	_ = d.Set("group_members", memberList)
 	_ = d.Set("group_id", toks[0])
 	return nil
