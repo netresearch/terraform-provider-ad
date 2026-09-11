@@ -20,15 +20,85 @@ type GroupMember struct {
 	DN             string `json:"DistinguishedName"`
 	GUID           string `json:"ObjectGUID"`
 	Name           string `json:"Name"`
+	SID            SID    `json:"SID"`
+}
+
+// Identifiers returns every form by which this member can be named in a
+// configuration. The schema documents all of them as interchangeable, and
+// Get-ADGroupMember returns all of them, so a member read back from the
+// directory can be recognised whichever one the practitioner wrote.
+//
+// Empty forms are skipped: a member built from configuration carries only the
+// one string the practitioner supplied.
+func (g *GroupMember) Identifiers() []string {
+	out := make([]string, 0, 5)
+	for _, id := range []string{g.GUID, g.DN, g.SamAccountName, g.Name, g.SID.Value} {
+		if id != "" {
+			out = append(out, id)
+		}
+	}
+	return out
+}
+
+// Matches reports whether other names the same directory object as g. Any
+// identifier form matching any other counts, because a configuration may use a
+// SAM account name where the directory answers with a GUID — comparing only
+// GUIDs made every such configuration produce a permanent diff.
+//
+// Comparison is case-insensitive: Active Directory treats these identifiers
+// that way, and GUIDs in particular come back in whatever casing was stored.
+func (g *GroupMember) Matches(other *GroupMember) bool {
+	for _, a := range g.Identifiers() {
+		for _, b := range other.Identifiers() {
+			if strings.EqualFold(a, b) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func groupExistsInList(g *GroupMember, memberList []*GroupMember) bool {
 	for _, item := range memberList {
-		if g.GUID == item.GUID {
+		if g.Matches(item) {
 			return true
 		}
 	}
 	return false
+}
+
+// ReconcileMemberIdentifiers decides what to write to state for the members the
+// directory reports, given what the configuration currently holds.
+//
+// A member the configuration already names keeps that spelling, whichever
+// identifier form it is. Anything else — a member added outside Terraform — is
+// written as its GUID, so it still shows up as drift to be removed.
+//
+// Without this the read wrote GUIDs unconditionally. A configuration naming
+// members by SAM account name or distinguished name therefore disagreed with
+// state on every single plan, and Terraform proposed removing and re-adding
+// every member forever.
+func ReconcileMemberIdentifiers(actual []*GroupMember, configured []string) []string {
+	out := make([]string, 0, len(actual))
+
+	for _, member := range actual {
+		out = append(out, preferConfiguredIdentifier(member, configured))
+	}
+
+	return out
+}
+
+func preferConfiguredIdentifier(member *GroupMember, configured []string) string {
+	for _, candidate := range configured {
+		if candidate == "" {
+			continue
+		}
+		if member.Matches(&GroupMember{GUID: candidate}) {
+			return candidate
+		}
+	}
+
+	return member.GUID
 }
 
 func diffGroupMemberLists(expectedMembers, existingMembers []*GroupMember) ([]*GroupMember, []*GroupMember) {
