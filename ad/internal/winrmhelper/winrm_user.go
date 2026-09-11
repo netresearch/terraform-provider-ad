@@ -335,19 +335,7 @@ func (u *User) ModifyUser(d *schema.ResourceData, conf *config.ProviderConf) err
 		for k, v := range oldSortedMap {
 			if newVal, ok := newSortedMap[k]; ok {
 				if !reflect.DeepEqual(v, newVal) {
-					var out string
-					if reflect.ValueOf(newVal).Kind() == reflect.Slice {
-						quotedStrings := make([]string, len(newVal.([]string)))
-						for idx, s := range newVal.([]string) {
-							// Using %q here will cause double quotes inside the string to be escaped with \"
-							// which is not desirable in Powershell
-							quotedStrings[idx] = fmt.Sprintf(`"%s"`, s)
-						}
-						out = strings.Join(quotedStrings, ",")
-					} else {
-						out = fmt.Sprintf(`"%s"`, newVal.(string))
-					}
-					toReplace = append(toReplace, PSHashtableEntry(k, out))
+					toReplace = append(toReplace, PSHashtableEntry(k, PSHashtableValue(newVal)))
 				}
 			} else {
 				toClear = append(toClear, SanitiseString(k))
@@ -356,19 +344,7 @@ func (u *User) ModifyUser(d *schema.ResourceData, conf *config.ProviderConf) err
 
 		for k, newVal := range newSortedMap {
 			if _, ok := oldSortedMap[k]; !ok {
-				var out string
-				if reflect.ValueOf(newVal).Kind() == reflect.Slice {
-					quotedStrings := make([]string, len(newVal.([]string)))
-					for idx, s := range newVal.([]string) {
-						// Using %q here will cause double quotes inside the string to be escaped with \"
-						// which is not desirable in Powershell
-						quotedStrings[idx] = fmt.Sprintf(`"%s"`, s)
-					}
-					out = strings.Join(quotedStrings, ",")
-				} else {
-					out = fmt.Sprintf(`"%s"`, newVal.(string))
-				}
-				toAdd = append(toAdd, PSHashtableEntry(k, out))
+				toAdd = append(toAdd, PSHashtableEntry(k, PSHashtableValue(newVal)))
 			}
 		}
 

@@ -57,6 +57,68 @@ func TestPSHashtableEntryQuotesKey(t *testing.T) {
 	}
 }
 
+// TestPSHashtableEntryEscapesApostrophes guards the single-quoted literal. An
+// apostrophe in a key would otherwise close the literal early, and
+// custom_attributes keys come straight from the practitioner's configuration.
+func TestPSHashtableEntryEscapesApostrophes(t *testing.T) {
+	for _, c := range []struct {
+		name, key, want string
+	}{
+		{"apostrophe in key", "O'Brien", `'O''Brien'="x"`},
+		{"literal-breaking attempt", `a'+$(whoami)+'b`, "'a''+`$(whoami)+''b'=\"x\""},
+		{"no apostrophe is untouched", "plainKey", `'plainKey'="x"`},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			got := PSHashtableEntry(c.key, `"x"`)
+			if got != c.want {
+				t.Errorf("got %s, want %s", got, c.want)
+			}
+		})
+	}
+}
+
+// TestPSHashtableValueDoesNotDoubleQuote is the guard for a defect this pull
+// request nearly introduced. SortInnerSlice runs every value through GetString,
+// which returns it quoted. Quoting again yields `""Chief""` and makes the
+// Set-ADUser hashtable invalid.
+func TestPSHashtableValueDoesNotDoubleQuote(t *testing.T) {
+	for _, c := range []struct {
+		name string
+		in   any
+		want string
+	}{
+		{"scalar keeps its single pair of quotes", `"Chief"`, `"Chief"`},
+		{"slice is joined, not requoted", []string{`"a"`, `"b"`}, `"a","b"`},
+		{"single-element slice", []string{`"only"`}, `"only"`},
+		{"empty slice", []string{}, ``},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			got := PSHashtableValue(c.in)
+			if got != c.want {
+				t.Errorf("got %s, want %s", got, c.want)
+			}
+			if strings.Contains(got, `""`) && c.want != `` {
+				t.Errorf("got %s — the value was quoted twice", got)
+			}
+		})
+	}
+
+	// End to end through the pair, the way ModifyUser uses them.
+	t.Run("through SortInnerSlice, as ModifyUser does", func(t *testing.T) {
+		sorted := SortInnerSlice(map[string]any{
+			"title": "Chief",
+			"multi": []any{"a", "b"},
+		})
+
+		if got := PSHashtableEntry("title", PSHashtableValue(sorted["title"])); got != `'title'="Chief"` {
+			t.Errorf("scalar: got %s, want 'title'=\"Chief\"", got)
+		}
+		if got := PSHashtableEntry("multi", PSHashtableValue(sorted["multi"])); got != `'multi'="a","b"` {
+			t.Errorf("slice: got %s, want 'multi'=\"a\",\"b\"", got)
+		}
+	})
+}
+
 // TestGetOtherAttributesAcceptsNonStrings guards against the type assertion that
 // used to sit here. custom_attributes is free-form JSON, so a number or a
 // boolean is entirely ordinary input — and asserting it to string panics, taking
