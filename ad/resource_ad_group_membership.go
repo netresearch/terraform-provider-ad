@@ -6,9 +6,9 @@ import (
 
 	"github.com/hashicorp/terraform-provider-ad/ad/internal/config"
 
-	"github.com/hashicorp/go-uuid"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 	"github.com/hashicorp/terraform-provider-ad/ad/internal/winrmhelper"
+	"uuid"
 )
 
 func resourceADGroupMembership() *schema.Resource {
@@ -74,12 +74,7 @@ func resourceADGroupMembershipCreate(d *schema.ResourceData, meta any) error {
 		return err
 	}
 
-	membershipUUID, err := uuid.GenerateUUID()
-	if err != nil {
-		return fmt.Errorf("while generating UUID to use as unique membership ID: %s", err)
-	}
-
-	id := fmt.Sprintf("%s_%s", gm.GroupGUID, membershipUUID)
+	id := fmt.Sprintf("%s_%s", gm.GroupGUID, uuid.New())
 	d.SetId(id)
 
 	return nil

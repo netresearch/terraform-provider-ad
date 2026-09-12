@@ -9,7 +9,6 @@ import (
 
 	"github.com/hashicorp/terraform-provider-ad/ad/internal/config"
 
-	"github.com/hashicorp/go-uuid"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 	"github.com/hashicorp/terraform-provider-ad/ad/internal/adschema"
 	"github.com/hashicorp/terraform-provider-ad/ad/internal/gposec"
@@ -41,7 +40,7 @@ func resourceADGPOSecurityCreate(d *schema.ResourceData, meta any) error {
 	if guid == "" {
 		return fmt.Errorf("Cannot handle empty GPO GUID")
 	}
-	_, err = uuid.ParseUUID(guid)
+	err = parseGUID(guid)
 	if err != nil {
 		return fmt.Errorf("Cannot parse GUID %q: %s", guid, err)
 	}
@@ -116,7 +115,7 @@ func resourceADGPOSecurityUpdate(d *schema.ResourceData, meta any) error {
 	if guid == "" {
 		return fmt.Errorf("Cannot handle empty GPO GUID")
 	}
-	_, err = uuid.ParseUUID(guid)
+	err = parseGUID(guid)
 	if err != nil {
 		return fmt.Errorf("Cannot parse GUID %q: %s", guid, err)
 	}
