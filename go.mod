@@ -3,12 +3,12 @@ module github.com/hashicorp/terraform-provider-ad
 go 1.27.0
 
 require (
+	github.com/go-viper/mapstructure/v2 v2.5.0
 	github.com/hashicorp/go-cty v1.5.0
 	github.com/hashicorp/go-uuid v1.0.3
 	github.com/hashicorp/terraform-plugin-sdk/v2 v2.40.1
 	github.com/jcmturner/gokrb5/v8 v8.4.4
 	github.com/masterzen/winrm v0.0.0-20260407182533-5570be7f80cf
-	github.com/mitchellh/mapstructure v1.5.0
 	github.com/packer-community/winrmcp v0.0.0-20221126162354-6e900dd2c68f
 	golang.org/x/text v0.42.0
 	gopkg.in/ini.v1 v1.67.3
@@ -59,6 +59,7 @@ require (
 	github.com/mitchellh/copystructure v1.2.0 // indirect
 	github.com/mitchellh/go-testing-interface v1.14.1 // indirect
 	github.com/mitchellh/go-wordwrap v1.0.1 // indirect
+	github.com/mitchellh/mapstructure v1.5.0 // indirect
 	github.com/mitchellh/reflectwalk v1.0.2 // indirect
 	github.com/nu7hatch/gouuid v0.0.0-20131221200532-179d4d0c4d8d // indirect
 	github.com/oklog/run v1.2.0 // indirect

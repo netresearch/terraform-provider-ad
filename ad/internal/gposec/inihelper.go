@@ -7,8 +7,8 @@ import (
 	"log"
 	"reflect"
 
+	"github.com/go-viper/mapstructure/v2"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
-	"github.com/mitchellh/mapstructure"
 	"golang.org/x/text/encoding/unicode"
 	"gopkg.in/ini.v1"
 )
