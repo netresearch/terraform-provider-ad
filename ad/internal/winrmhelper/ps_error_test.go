@@ -171,17 +171,27 @@ func TestDecodeXMLCliDecodesAWellFormedDocument(t *testing.T) {
 // An empty <S></S> element used to panic: str[0] was indexed before the length
 // check, so decoding an error message took the provider down with an index out
 // of range.
+//
+// The expectations are exact, not substring checks. The fragments are
+// concatenated, so anything an empty element contributes lands beside its
+// sibling and a Contains assertion would not see it.
 func TestDecodeXMLCliHandlesEmptyElements(t *testing.T) {
-	for _, doc := range []string{
-		`#< CLIXML<Objs><S></S></Objs>`,
-		`#< CLIXML<Objs><S>   </S></Objs>`,
-		`#< CLIXML<Objs><S></S><S>Remove-ADUser : failed</S></Objs>`,
-		`#< CLIXML<Objs><S>+</S></Objs>`,
-	} {
-		got, err := decodeXMLCli(doc)
+	cases := []struct{ doc, want string }{
+		{`#< CLIXML<Objs><S></S></Objs>`, ""},
+		{`#< CLIXML<Objs><S>   </S></Objs>`, ""},
+		{`#< CLIXML<Objs><S></S><S>Remove-ADUser : failed</S></Objs>`, "Remove-ADUser : failed"},
+		{`#< CLIXML<Objs><S>Remove-ADUser : failed</S><S></S></Objs>`, "Remove-ADUser : failed"},
+		{`#< CLIXML<Objs><S>+</S></Objs>`, "+"},
+	}
+
+	for _, c := range cases {
+		got, err := decodeXMLCli(c.doc)
 		if err != nil {
-			t.Errorf("decoding %q: %v", doc, err)
+			t.Errorf("decoding %q: %v", c.doc, err)
+			continue
 		}
-		_ = got
+		if got != c.want {
+			t.Errorf("decodeXMLCli(%q) = %q, want %q", c.doc, got, c.want)
+		}
 	}
 }

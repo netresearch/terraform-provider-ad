@@ -135,15 +135,23 @@ func TestSecretPasswordRegistersTheRendering(t *testing.T) {
 
 // Registering a secret is opt-in per call site, so a new command that embeds a
 // password is one forgotten option away from printing it. This is the guard:
-// any production file that builds a -AsPlainText command must also register it.
+// any file IN THIS PACKAGE that builds a -AsPlainText command must also register
+// it. It reads only its own directory, so a password command added to another
+// package is outside its reach.
 //
 // Crude on purpose — the alternative is a type that cannot be constructed
 // without a secret, which is a larger change than this package needs today.
 func TestEveryCommandCarryingAPasswordRegistersIt(t *testing.T) {
-	// Positive control: the guard must recognise the shape it looks for, or a
-	// rename silently disables it and the count below still looks reassuring.
-	if !strings.Contains(`-AccountPassword (ConvertTo-SecureString -AsPlainText %s -Force)`, "-AsPlainText") {
-		t.Fatal("the guard no longer recognises the command shape it exists for")
+	// Positive control against the production source, not against a literal in
+	// this test: a control that carries its own subject cannot fail. If the
+	// command shape is ever renamed, the guard would quietly stop looking for
+	// anything that exists, and the count below would still read as reassuring.
+	known, err := os.ReadFile(filepath.Clean("winrm_user.go"))
+	if err != nil {
+		t.Fatalf("reading the file this guard is calibrated against: %v", err)
+	}
+	if !strings.Contains(string(known), "-AsPlainText") {
+		t.Fatal("no production file embeds -AsPlainText any more; this guard is looking for a shape that no longer exists")
 	}
 
 	entries, err := os.ReadDir(".")
