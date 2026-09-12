@@ -47,20 +47,7 @@ func GetSecIniContents(conf *config.ProviderConf, gpo *GPO) ([]byte, error) {
 	log.Printf("[DEBUG] Getting security settings inf from %s", gptPath)
 
 	cmd := fmt.Sprintf(`Get-Content "%s"`, gptPath)
-	domainName := conf.Settings.DomainName
-	if conf.Settings.KrbRealm == domainName {
-		domainName = "$env:computername"
-	}
-	psOpts := CreatePSCommandOpts{
-		JSONOutput:      false,
-		ForceArray:      false,
-		ExecLocally:     conf.IsConnectionTypeLocal(),
-		PassCredentials: conf.IsPassCredentialsEnabled(),
-		Username:        conf.Settings.WinRMUsername,
-		Password:        conf.Settings.WinRMPassword,
-		Server:          domainName,
-		InvokeCommand:   conf.IsPassCredentialsEnabled(),
-	}
+	psOpts := NewDomainPSCommandOpts(conf)
 	psCmd := NewPSCommand([]string{cmd}, psOpts)
 	result, err := psCmd.Run(conf)
 	if err != nil {
@@ -117,20 +104,7 @@ func RemoveSecIni(conf *config.ProviderConf, cpConn *winrmcp.Winrmcp, gpo *GPO) 
 	log.Printf("[DEBUG] Getting security settings inf from %s", gptPath)
 
 	cmd := fmt.Sprintf(`Remove-Item "%s"`, gptPath)
-	domainName := conf.Settings.DomainName
-	if conf.Settings.KrbRealm == domainName {
-		domainName = "$env:computername"
-	}
-	psOpts := CreatePSCommandOpts{
-		JSONOutput:      false,
-		ForceArray:      false,
-		ExecLocally:     conf.IsConnectionTypeLocal(),
-		PassCredentials: conf.IsPassCredentialsEnabled(),
-		Username:        conf.Settings.WinRMUsername,
-		Password:        conf.Settings.WinRMPassword,
-		Server:          domainName,
-		InvokeCommand:   conf.IsPassCredentialsEnabled(),
-	}
+	psOpts := NewDomainPSCommandOpts(conf)
 	psCmd := NewPSCommand([]string{cmd}, psOpts)
 	result, err := psCmd.Run(conf)
 	if err != nil {

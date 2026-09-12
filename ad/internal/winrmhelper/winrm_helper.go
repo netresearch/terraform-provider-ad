@@ -99,15 +99,7 @@ func SanitiseString(key string) string {
 // These are required for the security settings part of a GPO to work.
 func SetMachineExtensionNames(conf *config.ProviderConf, gpoDN, value string) error {
 	cmd := fmt.Sprintf(`Set-ADObject -Identity "%s" -Replace @{gPCMachineExtensionNames="%s"}`, gpoDN, value)
-	psOpts := CreatePSCommandOpts{
-		JSONOutput:      false,
-		ForceArray:      false,
-		ExecLocally:     conf.IsConnectionTypeLocal(),
-		PassCredentials: conf.IsPassCredentialsEnabled(),
-		Username:        conf.Settings.WinRMUsername,
-		Password:        conf.Settings.WinRMPassword,
-		Server:          conf.IdentifyDomainController(),
-	}
+	psOpts := NewPSCommandOpts(conf)
 	psCmd := NewPSCommand([]string{cmd}, psOpts)
 	result, err := psCmd.Run(conf)
 	if err != nil {
@@ -246,20 +238,8 @@ func UploadFiletoSYSVOL(conf *config.ProviderConf, cpClient *winrmcp.Winrmcp, bu
 	x := toks[:len(toks)-1]
 	destDir := strings.Join(x, `\`)
 	mdCmd := fmt.Sprintf(`$check=Test-Path "%s"; if (!$check)  {md "%s"}`, destDir, destDir)
-	domainName := conf.Settings.DomainName
-	if conf.Settings.KrbRealm == domainName {
-		domainName = "$env:computername"
-	}
-	mdPSComamnd := NewPSCommand([]string{mdCmd}, CreatePSCommandOpts{
-		ExecLocally:     conf.IsConnectionTypeLocal(),
-		JSONOutput:      false,
-		ForceArray:      false,
-		PassCredentials: conf.IsPassCredentialsEnabled(),
-		InvokeCommand:   conf.IsPassCredentialsEnabled(),
-		Username:        conf.Settings.WinRMUsername,
-		Password:        conf.Settings.WinRMPassword,
-		Server:          domainName,
-	})
+	domainOpts := NewDomainPSCommandOpts(conf)
+	mdPSComamnd := NewPSCommand([]string{mdCmd}, domainOpts)
 	mdOutput, err := mdPSComamnd.Run(conf)
 	if err != nil {
 		return fmt.Errorf("while renaming GPO: %s", err)
@@ -268,16 +248,7 @@ func UploadFiletoSYSVOL(conf *config.ProviderConf, cpClient *winrmcp.Winrmcp, bu
 	}
 
 	cpCmd := fmt.Sprintf(`Copy-Item "%s" "%s"; Remove-Item "%s"`, tmpPath, destPath, tmpPath)
-	cpPSComamnd := NewPSCommand([]string{cpCmd}, CreatePSCommandOpts{
-		ExecLocally:     conf.IsConnectionTypeLocal(),
-		JSONOutput:      false,
-		ForceArray:      false,
-		PassCredentials: conf.IsPassCredentialsEnabled(),
-		InvokeCommand:   conf.IsPassCredentialsEnabled(),
-		Username:        conf.Settings.WinRMUsername,
-		Password:        conf.Settings.WinRMPassword,
-		Server:          domainName,
-	})
+	cpPSComamnd := NewPSCommand([]string{cpCmd}, domainOpts)
 	cpOutput, err := cpPSComamnd.Run(conf)
 	if err != nil {
 		return fmt.Errorf("while renaming GPO: %s", err)

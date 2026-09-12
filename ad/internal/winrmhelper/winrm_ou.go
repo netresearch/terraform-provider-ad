@@ -46,15 +46,8 @@ func NewOrgUnitFromHost(conf *config.ProviderConf, guid, name, path string) (*Or
 	} else {
 		return nil, fmt.Errorf("invalid inputs, dn or a combination of path and name are required")
 	}
-	psOpts := CreatePSCommandOpts{
-		JSONOutput:      true,
-		ForceArray:      false,
-		ExecLocally:     conf.IsConnectionTypeLocal(),
-		PassCredentials: conf.IsPassCredentialsEnabled(),
-		Username:        conf.Settings.WinRMUsername,
-		Password:        conf.Settings.WinRMPassword,
-		Server:          conf.IdentifyDomainController(),
-	}
+	psOpts := NewPSCommandOpts(conf)
+	psOpts.JSONOutput = true
 	psCmd := NewPSCommand([]string{cmd}, psOpts)
 	result, err := psCmd.Run(conf)
 	if err != nil {
@@ -90,15 +83,8 @@ func (o *OrgUnit) Create(conf *config.ProviderConf) (string, error) {
 	}
 
 	cmd = fmt.Sprintf("%s -ProtectedFromAccidentalDeletion:$%t", cmd, o.Protected)
-	psOpts := CreatePSCommandOpts{
-		JSONOutput:      true,
-		ForceArray:      false,
-		ExecLocally:     conf.IsConnectionTypeLocal(),
-		PassCredentials: conf.IsPassCredentialsEnabled(),
-		Username:        conf.Settings.WinRMUsername,
-		Password:        conf.Settings.WinRMPassword,
-		Server:          conf.IdentifyDomainController(),
-	}
+	psOpts := NewPSCommandOpts(conf)
+	psOpts.JSONOutput = true
 	psCmd := NewPSCommand([]string{cmd}, psOpts)
 	result, err := psCmd.Run(conf)
 	if err != nil {
@@ -134,15 +120,8 @@ func (o *OrgUnit) Update(conf *config.ProviderConf, changes map[string]any) erro
 	}
 
 	if cmd != "Set-ADOrganizationalUnit -Identity" {
-		psOpts := CreatePSCommandOpts{
-			JSONOutput:      true,
-			ForceArray:      false,
-			ExecLocally:     conf.IsConnectionTypeLocal(),
-			PassCredentials: conf.IsPassCredentialsEnabled(),
-			Username:        conf.Settings.WinRMUsername,
-			Password:        conf.Settings.WinRMPassword,
-			Server:          conf.IdentifyDomainController(),
-		}
+		psOpts := NewPSCommandOpts(conf)
+		psOpts.JSONOutput = true
 		psCmd := NewPSCommand([]string{cmd}, psOpts)
 		result, err := psCmd.Run(conf)
 		if err != nil {
@@ -157,15 +136,8 @@ func (o *OrgUnit) Update(conf *config.ProviderConf, changes map[string]any) erro
 		var unprotected bool
 		if o.Protected == true {
 			cmd := fmt.Sprintf("Set-ADOrganizationalUnit -Identity %q -ProtectedFromAccidentalDeletion:$false", o.GUID)
-			psOpts := CreatePSCommandOpts{
-				JSONOutput:      true,
-				ForceArray:      false,
-				ExecLocally:     conf.IsConnectionTypeLocal(),
-				PassCredentials: conf.IsPassCredentialsEnabled(),
-				Username:        conf.Settings.WinRMUsername,
-				Password:        conf.Settings.WinRMPassword,
-				Server:          conf.IdentifyDomainController(),
-			}
+			psOpts := NewPSCommandOpts(conf)
+			psOpts.JSONOutput = true
 			psCmd := NewPSCommand([]string{cmd}, psOpts)
 			result, err := psCmd.Run(conf)
 			if err != nil {
@@ -178,15 +150,8 @@ func (o *OrgUnit) Update(conf *config.ProviderConf, changes map[string]any) erro
 		}
 
 		cmd := fmt.Sprintf("Move-ADObject -Identity %q -TargetPath %q", o.GUID, path.(string))
-		psOpts := CreatePSCommandOpts{
-			JSONOutput:      true,
-			ForceArray:      false,
-			ExecLocally:     conf.IsConnectionTypeLocal(),
-			PassCredentials: conf.IsPassCredentialsEnabled(),
-			Username:        conf.Settings.WinRMUsername,
-			Password:        conf.Settings.WinRMPassword,
-			Server:          conf.IdentifyDomainController(),
-		}
+		psOpts := NewPSCommandOpts(conf)
+		psOpts.JSONOutput = true
 		psCmd := NewPSCommand([]string{cmd}, psOpts)
 		result, err := psCmd.Run(conf)
 		if err != nil {
@@ -198,15 +163,8 @@ func (o *OrgUnit) Update(conf *config.ProviderConf, changes map[string]any) erro
 
 		if unprotected == true {
 			cmd := fmt.Sprintf("Set-ADOrganizationalUnit -Identity %q -ProtectedFromAccidentalDeletion:$true", o.GUID)
-			psOpts := CreatePSCommandOpts{
-				JSONOutput:      true,
-				ForceArray:      false,
-				ExecLocally:     conf.IsConnectionTypeLocal(),
-				PassCredentials: conf.IsPassCredentialsEnabled(),
-				Username:        conf.Settings.WinRMUsername,
-				Password:        conf.Settings.WinRMPassword,
-				Server:          conf.IdentifyDomainController(),
-			}
+			psOpts := NewPSCommandOpts(conf)
+			psOpts.JSONOutput = true
 			psCmd := NewPSCommand([]string{cmd}, psOpts)
 			result, err := psCmd.Run(conf)
 			if err != nil {
@@ -220,15 +178,8 @@ func (o *OrgUnit) Update(conf *config.ProviderConf, changes map[string]any) erro
 
 	if protected, ok := changes["protected"]; ok {
 		cmd = fmt.Sprintf("Set-ADObject -Identity %s -ProtectedFromAccidentalDeletion:$%t", o.GUID, protected.(bool))
-		psOpts := CreatePSCommandOpts{
-			JSONOutput:      true,
-			ForceArray:      false,
-			ExecLocally:     conf.IsConnectionTypeLocal(),
-			PassCredentials: conf.IsPassCredentialsEnabled(),
-			Username:        conf.Settings.WinRMUsername,
-			Password:        conf.Settings.WinRMPassword,
-			Server:          conf.IdentifyDomainController(),
-		}
+		psOpts := NewPSCommandOpts(conf)
+		psOpts.JSONOutput = true
 		psCmd := NewPSCommand([]string{cmd}, psOpts)
 		result, err := psCmd.Run(conf)
 		if err != nil {
@@ -241,15 +192,8 @@ func (o *OrgUnit) Update(conf *config.ProviderConf, changes map[string]any) erro
 
 	if name, ok := changes["name"]; ok {
 		cmd = fmt.Sprintf("Rename-ADObject -Identity %q %q ", o.GUID, name.(string))
-		psOpts := CreatePSCommandOpts{
-			JSONOutput:      true,
-			ForceArray:      false,
-			ExecLocally:     conf.IsConnectionTypeLocal(),
-			PassCredentials: conf.IsPassCredentialsEnabled(),
-			Username:        conf.Settings.WinRMUsername,
-			Password:        conf.Settings.WinRMPassword,
-			Server:          conf.IdentifyDomainController(),
-		}
+		psOpts := NewPSCommandOpts(conf)
+		psOpts.JSONOutput = true
 		psCmd := NewPSCommand([]string{cmd}, psOpts)
 		result, err := psCmd.Run(conf)
 		if err != nil {
@@ -274,32 +218,18 @@ func (o *OrgUnit) Delete(conf *config.ProviderConf) error {
 		"Remove-ADOrganizationalUnit -confirm:$false",
 	}
 
-	psOpts := CreatePSCommandOpts{
-		JSONOutput:      false,
-		ForceArray:      false,
-		ExecLocally:     conf.IsConnectionTypeLocal(),
-		PassCredentials: conf.IsPassCredentialsEnabled(),
-		Username:        conf.Settings.WinRMUsername,
-		Password:        conf.Settings.WinRMPassword,
-		Server:          conf.IdentifyDomainController(),
-		SkipCredPrefix:  true,
-	}
+	psOpts := NewPSCommandOpts(conf)
+	psOpts.SkipCredPrefix = true
 
 	for _, subCmd := range subCmds {
 		cmds = append(cmds, NewPSCommand([]string{subCmd}, psOpts).String())
 	}
 
 	cmd := strings.Join(cmds, "|")
-	psOpts = CreatePSCommandOpts{
-		JSONOutput:      true,
-		ForceArray:      false,
-		ExecLocally:     conf.IsConnectionTypeLocal(),
-		PassCredentials: conf.IsPassCredentialsEnabled(),
-		Username:        conf.Settings.WinRMUsername,
-		Password:        conf.Settings.WinRMPassword,
-		SkipCredSuffix:  true,
-		Server:          "",
-	}
+	psOpts = NewPSCommandOpts(conf)
+	psOpts.JSONOutput = true
+	psOpts.Server = ""
+	psOpts.SkipCredSuffix = true
 	psCmd := NewPSCommand([]string{cmd}, psOpts)
 	result, err := psCmd.Run(conf)
 	if err != nil {

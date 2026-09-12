@@ -78,20 +78,8 @@ func GetGPOFromHost(conf *config.ProviderConf, name, guid string) (*GPO, error) 
 	} else if guid != "" {
 		cmd = getGPOCmdByGUID(guid)
 	}
-	domainName := conf.Settings.DomainName
-	if conf.Settings.KrbRealm == domainName {
-		domainName = "$env:computername"
-	}
-	psOpts := CreatePSCommandOpts{
-		JSONOutput:      true,
-		ForceArray:      false,
-		ExecLocally:     conf.IsConnectionTypeLocal(),
-		PassCredentials: conf.IsPassCredentialsEnabled(),
-		Username:        conf.Settings.WinRMUsername,
-		Password:        conf.Settings.WinRMPassword,
-		Server:          domainName,
-		InvokeCommand:   conf.IsPassCredentialsEnabled(),
-	}
+	psOpts := NewDomainPSCommandOpts(conf)
+	psOpts.JSONOutput = true
 	psCmd := NewPSCommand([]string{cmd}, psOpts)
 	result, err := psCmd.Run(conf)
 	if err != nil {
@@ -150,20 +138,7 @@ func (g *GPO) Rename(conf *config.ProviderConf, target string) error {
 		cmds = append(cmds, fmt.Sprintf("-Domain %s", g.Domain))
 	}
 
-	domainName := conf.Settings.DomainName
-	if conf.Settings.KrbRealm == domainName {
-		domainName = "$env:computername"
-	}
-	psOpts := CreatePSCommandOpts{
-		JSONOutput:      false,
-		ForceArray:      false,
-		ExecLocally:     conf.IsConnectionTypeLocal(),
-		PassCredentials: conf.IsPassCredentialsEnabled(),
-		Username:        conf.Settings.WinRMUsername,
-		Password:        conf.Settings.WinRMPassword,
-		Server:          domainName,
-		InvokeCommand:   conf.IsPassCredentialsEnabled(),
-	}
+	psOpts := NewDomainPSCommandOpts(conf)
 	psCmd := NewPSCommand(cmds, psOpts)
 	result, err := psCmd.Run(conf)
 	if err != nil {
@@ -178,20 +153,7 @@ func (g *GPO) Rename(conf *config.ProviderConf, target string) error {
 func (g *GPO) ChangeStatus(conf *config.ProviderConf, status string) error {
 	cmd := fmt.Sprintf(`(%s).GpoStatus = "%s"`, getGPOCmdByGUID(g.ID), status)
 
-	domainName := conf.Settings.DomainName
-	if conf.Settings.KrbRealm == domainName {
-		domainName = "$env:computername"
-	}
-	psOpts := CreatePSCommandOpts{
-		JSONOutput:      false,
-		ForceArray:      false,
-		ExecLocally:     conf.IsConnectionTypeLocal(),
-		PassCredentials: conf.IsPassCredentialsEnabled(),
-		Username:        conf.Settings.WinRMUsername,
-		Password:        conf.Settings.WinRMPassword,
-		Server:          domainName,
-		InvokeCommand:   conf.IsPassCredentialsEnabled(),
-	}
+	psOpts := NewDomainPSCommandOpts(conf)
 	psCmd := NewPSCommand([]string{cmd}, psOpts)
 	result, err := psCmd.Run(conf)
 	if err != nil {
@@ -222,20 +184,8 @@ func (g *GPO) NewGPO(conf *config.ProviderConf) (string, error) {
 		cmds = append(cmds, fmt.Sprintf("-Comment %q", g.Description))
 	}
 
-	domainName := conf.Settings.DomainName
-	if conf.Settings.KrbRealm == domainName {
-		domainName = "$env:computername"
-	}
-	psOpts := CreatePSCommandOpts{
-		JSONOutput:      true,
-		ForceArray:      false,
-		ExecLocally:     conf.IsConnectionTypeLocal(),
-		PassCredentials: conf.IsPassCredentialsEnabled(),
-		Username:        conf.Settings.WinRMUsername,
-		Password:        conf.Settings.WinRMPassword,
-		Server:          domainName,
-		InvokeCommand:   conf.IsPassCredentialsEnabled(),
-	}
+	psOpts := NewDomainPSCommandOpts(conf)
+	psOpts.JSONOutput = true
 	psCmd := NewPSCommand(cmds, psOpts)
 	result, err := psCmd.Run(conf)
 	if err != nil {
@@ -258,20 +208,7 @@ func (g *GPO) NewGPO(conf *config.ProviderConf) (string, error) {
 // DeleteGPO delete the GPO container
 func (g *GPO) DeleteGPO(conf *config.ProviderConf) error {
 	cmd := fmt.Sprintf("Remove-GPO -Name %s -Domain %s", g.Name, g.Domain)
-	domainName := conf.Settings.DomainName
-	if conf.Settings.KrbRealm == domainName {
-		domainName = "$env:computername"
-	}
-	psOpts := CreatePSCommandOpts{
-		JSONOutput:      false,
-		ForceArray:      false,
-		ExecLocally:     conf.IsConnectionTypeLocal(),
-		PassCredentials: conf.IsPassCredentialsEnabled(),
-		Username:        conf.Settings.WinRMUsername,
-		Password:        conf.Settings.WinRMPassword,
-		Server:          domainName,
-		InvokeCommand:   conf.IsPassCredentialsEnabled(),
-	}
+	psOpts := NewDomainPSCommandOpts(conf)
 	psCmd := NewPSCommand([]string{cmd}, psOpts)
 	result, err := psCmd.Run(conf)
 	return CheckDeleteResult(result, err, "GpoWithNameNotFound", "GPO")
@@ -300,20 +237,7 @@ func (g *GPO) UpdateGPO(config *config.ProviderConf, d *schema.ResourceData) (st
 // of this function as well as GetsysVolPath to construct the GPO path on the DC's filesystem.
 func (g *GPO) getGPOFilePath(conf *config.ProviderConf) (string, error) {
 	cmd := fmt.Sprintf("(Get-ADObject  -LDAPFilter '(&(objectClass=groupPolicyContainer)(cn={%s}))' -Properties gPCFilesysPath).gPCFilesysPath", g.ID)
-	domainName := conf.Settings.DomainName
-	if conf.Settings.KrbRealm == domainName {
-		domainName = "$env:computername"
-	}
-	psOpts := CreatePSCommandOpts{
-		JSONOutput:      false,
-		ForceArray:      false,
-		ExecLocally:     conf.IsConnectionTypeLocal(),
-		PassCredentials: conf.IsPassCredentialsEnabled(),
-		Username:        conf.Settings.WinRMUsername,
-		Password:        conf.Settings.WinRMPassword,
-		Server:          domainName,
-		InvokeCommand:   conf.IsPassCredentialsEnabled(),
-	}
+	psOpts := NewDomainPSCommandOpts(conf)
 	psCmd := NewPSCommand([]string{cmd}, psOpts)
 	result, err := psCmd.Run(conf)
 	if err != nil {
@@ -329,20 +253,7 @@ func (g *GPO) getGPOFilePath(conf *config.ProviderConf) (string, error) {
 // and the value we get from getGPOFilePath is used to construct the GPO path on the DC's filesystem.
 func getSysVolPath(conf *config.ProviderConf) (string, error) {
 	cmd := "(Get-SmbShare sysvol).path"
-	domainName := conf.Settings.DomainName
-	if conf.Settings.KrbRealm == domainName {
-		domainName = "$env:computername"
-	}
-	psOpts := CreatePSCommandOpts{
-		JSONOutput:      false,
-		ForceArray:      false,
-		ExecLocally:     conf.IsConnectionTypeLocal(),
-		PassCredentials: conf.IsPassCredentialsEnabled(),
-		Username:        conf.Settings.WinRMUsername,
-		Password:        conf.Settings.WinRMPassword,
-		Server:          domainName,
-		InvokeCommand:   conf.IsPassCredentialsEnabled(),
-	}
+	psOpts := NewDomainPSCommandOpts(conf)
 	psCmd := NewPSCommand([]string{cmd}, psOpts)
 	result, err := psCmd.Run(conf)
 	if err != nil {
@@ -374,16 +285,8 @@ func (g *GPO) loadGPOVersions() error {
 // SetADGPOVersions updates AD with the given versions for a GPO
 func (g *GPO) SetADGPOVersions(conf *config.ProviderConf, gpoVersion uint32) error {
 
-	psOpts := CreatePSCommandOpts{
-		JSONOutput:      false,
-		ForceArray:      false,
-		ExecLocally:     conf.IsConnectionTypeLocal(),
-		PassCredentials: conf.IsPassCredentialsEnabled(),
-		Username:        conf.Settings.WinRMUsername,
-		Password:        conf.Settings.WinRMPassword,
-		Server:          conf.IdentifyDomainController(),
-		SkipCredPrefix:  true,
-	}
+	psOpts := NewPSCommandOpts(conf)
+	psOpts.SkipCredPrefix = true
 
 	tmpCmd := fmt.Sprintf("Get-ADObject  -LDAPFilter '(&(objectClass=groupPolicyContainer)(cn={%s}))' -Properties *", g.ID)
 	cmds := []string{
@@ -392,16 +295,9 @@ func (g *GPO) SetADGPOVersions(conf *config.ProviderConf, gpoVersion uint32) err
 	}
 
 	cmd := strings.Join(cmds, ";")
-	psOpts = CreatePSCommandOpts{
-		JSONOutput:      false,
-		ForceArray:      false,
-		ExecLocally:     conf.IsConnectionTypeLocal(),
-		PassCredentials: conf.IsPassCredentialsEnabled(),
-		Username:        conf.Settings.WinRMUsername,
-		Password:        conf.Settings.WinRMPassword,
-		Server:          "",
-		SkipCredSuffix:  true,
-	}
+	psOpts = NewPSCommandOpts(conf)
+	psOpts.Server = ""
+	psOpts.SkipCredSuffix = true
 	psCmd := NewPSCommand([]string{cmd}, psOpts)
 	result, err := psCmd.Run(conf)
 	if err != nil {
@@ -459,20 +355,7 @@ func (g *GPO) loadGPTIni(conf *config.ProviderConf) error {
 	gptPath := fmt.Sprintf("%s\\gpt.ini", g.basePath)
 	log.Printf("[DEBUG] Getting GPT ini from %s", gptPath)
 	cmd := fmt.Sprintf(`Get-Content "%s"`, gptPath)
-	domainName := conf.Settings.DomainName
-	if conf.Settings.KrbRealm == domainName {
-		domainName = "$env:computername"
-	}
-	psOpts := CreatePSCommandOpts{
-		JSONOutput:      false,
-		ForceArray:      false,
-		ExecLocally:     conf.IsConnectionTypeLocal(),
-		PassCredentials: conf.IsPassCredentialsEnabled(),
-		Username:        conf.Settings.WinRMUsername,
-		Password:        conf.Settings.WinRMPassword,
-		Server:          domainName,
-		InvokeCommand:   conf.IsPassCredentialsEnabled(),
-	}
+	psOpts := NewDomainPSCommandOpts(conf)
 	psCmd := NewPSCommand([]string{cmd}, psOpts)
 	result, err := psCmd.Run(conf)
 	if err != nil {

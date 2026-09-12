@@ -38,15 +38,8 @@ func (g *Group) AddGroup(conf *config.ProviderConf) (string, error) {
 	if g.Description != "" {
 		cmds = append(cmds, fmt.Sprintf("-Description %q", g.Description))
 	}
-	psOpts := CreatePSCommandOpts{
-		JSONOutput:      true,
-		ForceArray:      false,
-		ExecLocally:     conf.IsConnectionTypeLocal(),
-		PassCredentials: conf.IsPassCredentialsEnabled(),
-		Username:        conf.Settings.WinRMUsername,
-		Password:        conf.Settings.WinRMPassword,
-		Server:          conf.IdentifyDomainController(),
-	}
+	psOpts := NewPSCommandOpts(conf)
+	psOpts.JSONOutput = true
 	psCmd := NewPSCommand(cmds, psOpts)
 	result, err := psCmd.Run(conf)
 	if err != nil {
@@ -93,15 +86,7 @@ func (g *Group) ModifyGroup(d *schema.ResourceData, conf *config.ProviderConf) e
 	}
 
 	if len(cmds) > 1 {
-		psOpts := CreatePSCommandOpts{
-			JSONOutput:      false,
-			ForceArray:      false,
-			ExecLocally:     conf.IsConnectionTypeLocal(),
-			PassCredentials: conf.IsPassCredentialsEnabled(),
-			Username:        conf.Settings.WinRMUsername,
-			Password:        conf.Settings.WinRMPassword,
-			Server:          conf.IdentifyDomainController(),
-		}
+		psOpts := NewPSCommandOpts(conf)
 		psCmd := NewPSCommand(cmds, psOpts)
 		result, err := psCmd.Run(conf)
 		if err != nil {
@@ -115,15 +100,7 @@ func (g *Group) ModifyGroup(d *schema.ResourceData, conf *config.ProviderConf) e
 
 	if d.HasChange("name") {
 		cmd := fmt.Sprintf("Rename-ADObject -Identity %q -NewName %q", g.GUID, d.Get("name").(string))
-		psOpts := CreatePSCommandOpts{
-			JSONOutput:      false,
-			ForceArray:      false,
-			ExecLocally:     conf.IsConnectionTypeLocal(),
-			PassCredentials: conf.IsPassCredentialsEnabled(),
-			Username:        conf.Settings.WinRMUsername,
-			Password:        conf.Settings.WinRMPassword,
-			Server:          conf.IdentifyDomainController(),
-		}
+		psOpts := NewPSCommandOpts(conf)
 		psCmd := NewPSCommand([]string{cmd}, psOpts)
 		result, err := psCmd.Run(conf)
 		if err != nil {
@@ -137,15 +114,7 @@ func (g *Group) ModifyGroup(d *schema.ResourceData, conf *config.ProviderConf) e
 
 	if d.HasChange("container") {
 		cmd := fmt.Sprintf("Move-ADObject -Identity %q -TargetPath %q", g.GUID, d.Get("container").(string))
-		psOpts := CreatePSCommandOpts{
-			JSONOutput:      false,
-			ForceArray:      false,
-			ExecLocally:     conf.IsConnectionTypeLocal(),
-			PassCredentials: conf.IsPassCredentialsEnabled(),
-			Username:        conf.Settings.WinRMUsername,
-			Password:        conf.Settings.WinRMPassword,
-			Server:          conf.IdentifyDomainController(),
-		}
+		psOpts := NewPSCommandOpts(conf)
 		psCmd := NewPSCommand([]string{cmd}, psOpts)
 		result, err := psCmd.Run(conf)
 		if err != nil {
@@ -162,15 +131,7 @@ func (g *Group) ModifyGroup(d *schema.ResourceData, conf *config.ProviderConf) e
 // DeleteGroup removes a group
 func (g *Group) DeleteGroup(conf *config.ProviderConf) error {
 	cmd := fmt.Sprintf("Remove-ADGroup -Identity %s -Confirm:$false", g.GUID)
-	psOpts := CreatePSCommandOpts{
-		JSONOutput:      false,
-		ForceArray:      false,
-		ExecLocally:     conf.IsConnectionTypeLocal(),
-		PassCredentials: conf.IsPassCredentialsEnabled(),
-		Username:        conf.Settings.WinRMUsername,
-		Password:        conf.Settings.WinRMPassword,
-		Server:          conf.IdentifyDomainController(),
-	}
+	psOpts := NewPSCommandOpts(conf)
 	psCmd := NewPSCommand([]string{cmd}, psOpts)
 	result, err := psCmd.Run(conf)
 	if err != nil {
@@ -204,15 +165,8 @@ func GetGroupFromResource(d *schema.ResourceData) *Group {
 // retrieved from the AD Controller.
 func GetGroupFromHost(conf *config.ProviderConf, guid string) (*Group, error) {
 	cmd := fmt.Sprintf("Get-ADGroup -identity %q -properties *", guid)
-	psOpts := CreatePSCommandOpts{
-		JSONOutput:      true,
-		ForceArray:      false,
-		ExecLocally:     conf.IsConnectionTypeLocal(),
-		PassCredentials: conf.IsPassCredentialsEnabled(),
-		Username:        conf.Settings.WinRMUsername,
-		Password:        conf.Settings.WinRMPassword,
-		Server:          conf.IdentifyDomainController(),
-	}
+	psOpts := NewPSCommandOpts(conf)
+	psOpts.JSONOutput = true
 	psCmd := NewPSCommand([]string{cmd}, psOpts)
 	result, err := psCmd.Run(conf)
 
