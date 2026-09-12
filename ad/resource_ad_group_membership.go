@@ -64,10 +64,14 @@ func resourceADGroupMembershipRead(d *schema.ResourceData, meta any) error {
 }
 
 // membershipID builds the resource id for a group membership: the group's GUID,
-// an underscore, and a fresh GUID that only has to be unique. Read splits the id
-// on that underscore and uses the first token, so neither half may contain one —
-// uuid.UUID is a [16]byte, and a %s verb on it renders raw bytes rather than the
-// canonical text unless String is reached. That form compiles and vets.
+// an underscore, and a fresh GUID that only has to be unique.
+//
+// Read splits on the first underscore and uses the token before it, so the group
+// half must not contain one; what follows is opaque to Read. The unique half is
+// still built as canonical text rather than left free-form, because uuid.UUID is
+// a [16]byte and a %s verb on it renders raw bytes unless String is reached — a
+// form that compiles and vets, and would put a resource id that is not valid
+// UTF-8 into serialised state and into what `terraform import` has to be given.
 func membershipID(groupGUID string) string {
 	return fmt.Sprintf("%s_%s", groupGUID, uuid.New().String())
 }

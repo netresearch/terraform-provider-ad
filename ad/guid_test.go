@@ -56,8 +56,10 @@ func TestParseGUIDAcceptsOnlyTheCanonicalForm(t *testing.T) {
 //
 // uuid.UUID is a [16]byte. A %s verb on it renders raw bytes rather than the
 // canonical text unless String is reached, and that form compiles and vets, so
-// the defect is available and has to be pinned here. Read splits the id on the
-// underscore, which makes the raw-byte form corrupting rather than merely ugly.
+// the defect is available and has to be pinned here. Read reads only the token
+// before the first underscore, so the raw-byte form does not corrupt Read; what
+// it corrupts is the resource id itself, which lands in serialised state and is
+// what `terraform import` must be handed back.
 func TestMembershipIDIsSplittableAndCanonical(t *testing.T) {
 	const group = "6AC1786C-016F-11D2-945F-00C04FB984F9"
 
@@ -80,16 +82,25 @@ func TestMembershipIDIsSplittableAndCanonical(t *testing.T) {
 	}
 }
 
-// TestGPOGUIDValidatorRejectsNonGUIDs reaches the ValidateFunc through the
-// resource schema, which is how Terraform reaches it. Without this, deleting the
-// validation from resource_ad_gplink.go left the whole suite green: the only
-// coverage was an acceptance test behind TF_ACC, and CI runs `make test` alone.
+// TestGPOGUIDValidatorRejectsNonGUIDs reaches the ValidateFunc the way Terraform
+// does: through the provider's resource map, not by calling resourceADGPLink
+// directly. Going through the map also pins the registration — repointing
+// "ad_gplink" at another resource otherwise leaves the whole suite green.
 //
-// Its input, "something-horribly-wrong", is 24 characters, so it exercises only
-// the length branch. The cases here cover both branches and the three spellings
-// a bare uuid.Parse would accept.
+// Without this test, deleting the validation from resource_ad_gplink.go left the
+// suite green too: its only coverage was an acceptance test behind TF_ACC, and
+// the workflow that runs on a pull request runs `make test` and `go mod verify`,
+// neither of which sets TF_ACC.
+//
+// That acceptance test's input, "something-horribly-wrong", is 24 characters, so
+// it exercises only the length branch. The cases here cover both branches and the
+// three spellings a bare uuid.Parse would accept.
 func TestGPOGUIDValidatorRejectsNonGUIDs(t *testing.T) {
-	validate := resourceADGPLink().Schema["gpo_guid"].ValidateFunc
+	gplink, ok := Provider().ResourcesMap["ad_gplink"]
+	if !ok {
+		t.Fatal("the provider does not register ad_gplink")
+	}
+	validate := gplink.Schema["gpo_guid"].ValidateFunc
 	if validate == nil {
 		t.Fatal("gpo_guid has no ValidateFunc")
 	}
