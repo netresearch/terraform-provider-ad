@@ -1,6 +1,10 @@
 package ad
 
-import "testing"
+import (
+	"fmt"
+	"testing"
+	"uuid"
+)
 
 // TestParseGUIDAcceptsOnlyTheCanonicalForm pins the strictness the provider had
 // while it used hashicorp/go-uuid, whose ParseUUID required exactly 36
@@ -43,5 +47,19 @@ func TestParseGUIDAcceptsOnlyTheCanonicalForm(t *testing.T) {
 				t.Errorf("parseGUID(%q) = nil, want rejected", tc.in)
 			}
 		})
+	}
+}
+
+// TestGeneratedGUIDIsCanonical pins the shape of what goes into a group
+// membership resource id. uuid.UUID is a [16]byte, so a %s verb renders the raw
+// bytes rather than the canonical text if the String method is ever not the one
+// reached — which compiles, vets, and would put control characters into an id.
+func TestGeneratedGUIDIsCanonical(t *testing.T) {
+	s := fmt.Sprintf("%s", uuid.New())
+	if len(s) != 36 {
+		t.Fatalf("generated id is %d characters, want 36: %q", len(s), s)
+	}
+	if err := parseGUID(s); err != nil {
+		t.Fatalf("generated id is not a canonical GUID: %v (%q)", err, s)
 	}
 }
