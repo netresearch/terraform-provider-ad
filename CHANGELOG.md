@@ -1,3 +1,12 @@
+## v0.5.3 (netresearch fork, September 12, 2026)
+
+NOTES:
+* **Provider**: the provider is built as Go 1.27 code. The `go` directive moves from 1.25.8 to 1.27.0; `.go-version` already pinned 1.27.0, so CI and the release binaries were on that toolchain and only the language version the compiler applied was behind. Released binaries are unaffected — this changes the Go version needed to build from source, and the README states 1.27.x. ([#40](https://github.com/netresearch/terraform-provider-ad/pull/40))
+* **Provider**: `github.com/mitchellh/mapstructure`, archived in 2023, is replaced by the maintained `github.com/go-viper/mapstructure/v2`. One consequence is visible in `ad_gpo_security`: a value that cannot be decoded is no longer quoted back in the error. `'maximum_log_size' expected type 'string', got unconvertible type 'int', value: '1024'` becomes the same message without the trailing value. The decoded result is unchanged — twelve inputs were decoded through both libraries and compared, in both directions, with no difference. ([#40](https://github.com/netresearch/terraform-provider-ad/pull/40))
+* **Provider**: `github.com/hashicorp/go-uuid` is replaced by the Go 1.27 standard-library `uuid` package. The set of GUIDs `ad_gplink` and `ad_gpo_security` accept is unchanged — only the canonical 36-character hyphenated form, verified across 9278 inputs against the previous parser with no disagreement. What changes is the wording when one is refused: `ad_gpo_security` reported `uuid is improperly formatted` and now reports `invalid uuid`. `ad_gplink` emits its own message and is unaffected. ([#40](https://github.com/netresearch/terraform-provider-ad/pull/40))
+* **Resource**: `ad_group_membership`: the random half of the resource id is now a v4 UUID. The previous generator formatted sixteen random bytes without setting the version and variant bits. The id is opaque and is never parsed back, so this affects memberships created from this release onwards and nothing in existing state. ([#40](https://github.com/netresearch/terraform-provider-ad/pull/40))
+* **Provider**: `golang.org/x/crypto` moves from v0.55.0 to v0.57.0, which removes GO-2026-6355 and GO-2026-6354 from the module graph. Neither was reachable: `govulncheck` reported no vulnerability the provider's code calls, before or after. GO-2026-5932 remains and has no fix. All other direct dependencies were already current. ([#40](https://github.com/netresearch/terraform-provider-ad/pull/40))
+
 ## v0.5.2 (netresearch fork, September 12, 2026)
 
 SECURITY:
