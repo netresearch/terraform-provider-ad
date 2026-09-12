@@ -96,10 +96,6 @@ func TestSkipCredentialPreambleKeepsTheSuffix(t *testing.T) {
 }
 
 func TestForceArrayWrapsASingleObject(t *testing.T) {
-	opts := CreatePSCommandOpts{ForceArray: true}
-	if !opts.ForceArray {
-		t.Fatal("fixture is wrong")
-	}
 	conf := credentialConf(t)
 	if !NewPSCommandOpts(conf, ForceArray()).ForceArray {
 		t.Error("ForceArray must set the switch that brackets a lone JSON object")

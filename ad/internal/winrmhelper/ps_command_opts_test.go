@@ -3,7 +3,6 @@ package winrmhelper
 import (
 	"os"
 	"path/filepath"
-	"regexp"
 	"runtime"
 	"strings"
 	"testing"
@@ -158,9 +157,18 @@ func TestDomainOptionTargetsTheDomain(t *testing.T) {
 	})
 }
 
-// literalOpts matches a CreatePSCommandOpts literal assigned to a variable —
-// the shape NewPSCommandOpts replaces.
-var literalOpts = regexp.MustCompile(`\w+\s*:?=\s*CreatePSCommandOpts\{`)
+// namesTheOptsType reports whether a line mentions CreatePSCommandOpts at all.
+//
+// This was a regex matching `x := CreatePSCommandOpts{`, which caught exactly
+// one shape out of nine. It could not catch the literal passed straight as an
+// argument — `NewPSCommand(cmds, CreatePSCommandOpts{…})`, which is precisely
+// the site this refactor removed — nor a pointer, a return, a slice or map
+// element, a line-split assignment, or field-by-field assignment after `var`.
+// Outside the exempt file no production line mentions the type for any
+// legitimate reason, so mentioning it at all is the signal.
+func namesTheOptsType(line string) bool {
+	return strings.Contains(line, "CreatePSCommandOpts")
+}
 
 // TestNoHandBuiltPSCommandOpts keeps the boilerplate from growing back.
 //
@@ -175,6 +183,26 @@ var literalOpts = regexp.MustCompile(`\w+\s*:?=\s*CreatePSCommandOpts\{`)
 // WithoutCredentials() now.
 func TestNoHandBuiltPSCommandOpts(t *testing.T) {
 	const exempt = "powershell_command.go"
+
+	// A guard with no positive control is a guard that a typo disables in
+	// silence, while the count below still prints a reassuring number. These are
+	// the shapes the previous regex let through.
+	for _, bad := range []string{
+		"\tpsOpts := CreatePSCommandOpts{",
+		"\treturn NewPSCommand(cmds, CreatePSCommandOpts{Username: \"u\"})",
+		"\tp := &CreatePSCommandOpts{Username: \"u\"}",
+		"\treturn CreatePSCommandOpts{Username: \"u\"}",
+		"\tm := map[string]CreatePSCommandOpts{\"a\": {Username: \"u\"}}",
+		"\tvar o CreatePSCommandOpts",
+		"\tpsOpts := CreatePSCommandOpts {",
+	} {
+		if !namesTheOptsType(bad) {
+			t.Fatalf("the guard does not recognise a hand-built literal, so it proves nothing: %q", bad)
+		}
+	}
+	if namesTheOptsType("\tpsOpts := NewPSCommandOpts(conf, JSONOutput())") {
+		t.Fatal("the guard flags the correct form, so every file would fail")
+	}
 
 	entries, err := os.ReadDir(".")
 	if err != nil {
@@ -196,7 +224,7 @@ func TestNoHandBuiltPSCommandOpts(t *testing.T) {
 		}
 
 		for i, line := range strings.Split(string(body), "\n") {
-			if literalOpts.MatchString(line) {
+			if namesTheOptsType(line) {
 				found++
 				t.Errorf("%s:%d builds CreatePSCommandOpts by hand:\n\t%s\n"+
 					"Use NewPSCommandOpts(conf, ...) with the options it needs.",

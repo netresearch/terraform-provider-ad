@@ -368,11 +368,25 @@ func (p *PSCommand) Run(conf *config.ProviderConf) (*PSCommandResult, error) {
 		return result, err
 	}
 
-	if p.ForceArray && result.Stdout != "" && string(result.Stdout[0]) != "[" {
-		result.Stdout = fmt.Sprintf("[%s]", result.Stdout)
+	if p.ForceArray {
+		result.Stdout = bracketLoneObject(result.Stdout)
 	}
 
 	return result, nil
+}
+
+// bracketLoneObject wraps a single JSON object in brackets.
+//
+// ConvertTo-Json emits a bare object for one result and an array for several, so
+// a caller unmarshalling into a slice gets a type error exactly when the
+// directory returns one member. Get-ADGroupMember is the case that hits it.
+//
+// Split out of Run because Run needs a WinRM connection and this does not.
+func bracketLoneObject(stdout string) string {
+	if stdout == "" || strings.HasPrefix(stdout, "[") {
+		return stdout
+	}
+	return fmt.Sprintf("[%s]", stdout)
 }
 
 func (p *PSCommand) String() string {

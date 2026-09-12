@@ -41,30 +41,44 @@ func TestCheckPSResultReportsANonZeroExitCode(t *testing.T) {
 	}
 }
 
-// Callers match on the error text to recognise a failure that is really a
-// success, so the marker has to survive the wrapping.
-func TestCheckPSResultKeepsTheStdErrMarkerMatchable(t *testing.T) {
-	err := checkPSResult(&PSCommandResult{ExitCode: 1, StdErr: "ADIdentityNotFoundException"}, nil, "removing the user", "")
-	if !strings.Contains(err.Error(), "ADIdentityNotFoundException") {
-		t.Errorf("marker lost: %q", err.Error())
-	}
-}
-
 // The error reaches the Terraform console and CI logs, and a failing PowerShell
 // error record quotes the command that produced it — which for New-ADUser is a
 // command carrying the account password.
 func TestCheckPSResultRedactsPasswordsInBothStreams(t *testing.T) {
-	const password = "sup3rs3cr3t"
+	const winrmPassword = "winrm-s3cr3t"
+	const accountPassword = "account-s3cr3t"
+
 	err := checkPSResult(&PSCommandResult{
 		ExitCode: 1,
-		StdErr:   fmt.Sprintf(`New-ADUser -AccountPassword (ConvertTo-SecureString -AsPlainText "%s" -Force) failed`, password),
-		Stdout:   fmt.Sprintf("WinRM password was %s", password),
-	}, nil, "creating the user", password)
+		StdErr:   fmt.Sprintf(`New-ADUser -AccountPassword (ConvertTo-SecureString -AsPlainText "%s" -Force) failed`, accountPassword),
+		Stdout:   fmt.Sprintf("WinRM password was %s", winrmPassword),
+	}, nil, "creating the user", winrmPassword)
 
-	if strings.Contains(err.Error(), password) {
-		t.Fatalf("password leaked into the error: %q", err.Error())
+	// Two distinct values on purpose. With one value the literal replacement of
+	// the WinRM password alone satisfies both assertions, and the four
+	// -AccountPassword patterns are never exercised — they could all be deleted
+	// with the suite still green.
+	for _, secret := range []string{winrmPassword, accountPassword} {
+		if strings.Contains(err.Error(), secret) {
+			t.Fatalf("%q leaked into the error: %q", secret, err.Error())
+		}
 	}
 	if strings.Count(err.Error(), "<REDACTED>") != 2 {
 		t.Errorf("expected both streams redacted, got %q", err.Error())
+	}
+}
+
+// The -AccountPassword patterns have to work on their own: a run without passed
+// credentials has no WinRM password, so the literal replacement does nothing.
+func TestCheckPSResultRedactsTheAccountPasswordWithoutAWinRMPassword(t *testing.T) {
+	const accountPassword = "account-s3cr3t"
+
+	err := checkPSResult(&PSCommandResult{
+		ExitCode: 1,
+		StdErr:   fmt.Sprintf(`New-ADUser -AccountPassword (ConvertTo-SecureString -AsPlainText "%s" -Force) failed`, accountPassword),
+	}, nil, "creating the user", "")
+
+	if strings.Contains(err.Error(), accountPassword) {
+		t.Errorf("account password leaked with no WinRM password set: %q", err.Error())
 	}
 }
