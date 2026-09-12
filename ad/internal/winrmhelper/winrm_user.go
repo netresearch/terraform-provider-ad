@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"reflect"
+	"strconv"
 	"strings"
 
 	"github.com/hashicorp/go-cty/cty"
@@ -86,8 +87,12 @@ func (u *User) NewUser(conf *config.ProviderConf) (string, error) {
 		cmds = append(cmds, fmt.Sprintf("-UserPrincipalName %q", u.PrincipalName))
 	}
 
+	// The exact substring the password renders to, kept so the command can
+	// register it as a secret: %q escapes, so neither u.Password nor the value
+	// the user configured appears in the command literally.
+	renderedPassword := strconv.Quote(u.Password)
 	if u.Password != "" {
-		cmds = append(cmds, fmt.Sprintf("-AccountPassword (ConvertTo-SecureString -AsPlainText %q -Force)", u.Password))
+		cmds = append(cmds, fmt.Sprintf("-AccountPassword (ConvertTo-SecureString -AsPlainText %s -Force)", renderedPassword))
 	}
 
 	if u.DisplayName != "" {
@@ -215,7 +220,8 @@ func (u *User) NewUser(conf *config.ProviderConf) (string, error) {
 		cmds = append(cmds, fmt.Sprintf("-OtherAttributes %s", attrs))
 	}
 
-	result, err := RunPSCommand(conf, "creating the user", strings.Join(cmds, " "), JSONOutput())
+	result, err := RunPSCommand(conf, "creating the user", strings.Join(cmds, " "),
+		JSONOutput(), Secret(renderedPassword))
 	if err != nil {
 		if ErrorMentions(err, "AlreadyExists") {
 			return "", fmt.Errorf("there is another User named %q", u.PrincipalName)
@@ -357,8 +363,9 @@ func (u *User) ModifyUser(d *schema.ResourceData, conf *config.ProviderConf) err
 	// A write-only value is null in state, so it can never produce a diff of its
 	// own — initial_password_wo_version is the only signal that it changed.
 	if d.HasChange("initial_password") || d.HasChange("initial_password_wo_version") {
-		cmd := fmt.Sprintf("Set-ADAccountPassword -Identity %q -Reset -NewPassword (ConvertTo-SecureString -AsPlainText %q -Force)", u.GUID, u.Password)
-		if _, err := RunPSCommand(conf, "setting the user's password", cmd); err != nil {
+		renderedPassword := strconv.Quote(u.Password)
+		cmd := fmt.Sprintf("Set-ADAccountPassword -Identity %q -Reset -NewPassword (ConvertTo-SecureString -AsPlainText %s -Force)", u.GUID, renderedPassword)
+		if _, err := RunPSCommand(conf, "setting the user's password", cmd, Secret(renderedPassword)); err != nil {
 			return err
 		}
 	}

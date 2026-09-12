@@ -24,6 +24,10 @@ type CreatePSCommandOpts struct {
 	SkipCredPrefix  bool
 	SkipCredSuffix  bool
 	Username        string
+
+	// Secrets are the exact substrings a caller embedded in the command and
+	// that must never be rendered. See the Secret option.
+	Secrets []string
 }
 
 // A PSOption changes one aspect of how a command is built. Everything that
@@ -73,6 +77,29 @@ func ComposedCommand() PSOption {
 	return func(_ *config.ProviderConf, o *CreatePSCommandOpts) {
 		o.Server = ""
 		o.SkipCredSuffix = true
+	}
+}
+
+// Secret registers a value that must not appear in an error or a log.
+//
+// `rendered` is the text as it stands IN THE COMMAND, not the raw secret. A
+// password reaches the command through SanitiseString and then %q, so neither
+// the value the user configured nor the sanitised one appears there literally,
+// and a literal replacement only matches what is actually present.
+//
+// This exists because the pattern-based redaction below it cannot be made
+// reliable: it anchors on `-AsPlainText "…" -Force)`, and a password containing
+// a double quote renders as `"pa`" + "`" + `\"ssWord1!"`, which the pattern does
+// not match at all — the full password then reaches the Terraform console. A
+// literal replacement is insensitive to quoting and escaping.
+//
+// What it still cannot do: PowerShell truncates a long error line before we ever
+// see it, and a truncated secret has no literal left to match.
+func Secret(rendered string) PSOption {
+	return func(_ *config.ProviderConf, o *CreatePSCommandOpts) {
+		if rendered != "" {
+			o.Secrets = append(o.Secrets, rendered)
+		}
 	}
 }
 
@@ -130,7 +157,7 @@ func NewPSCommandOpts(conf *config.ProviderConf, opts ...PSOption) CreatePSComma
 func RunPSCommand(conf *config.ProviderConf, what, cmd string, opts ...PSOption) (*PSCommandResult, error) {
 	psOpts := NewPSCommandOpts(conf, opts...)
 	result, err := NewPSCommand([]string{cmd}, psOpts).Run(conf)
-	if cmdErr := checkPSResult(result, err, what, psOpts.Password); cmdErr != nil {
+	if cmdErr := checkPSResult(result, err, what, psOpts.Password, psOpts.Secrets...); cmdErr != nil {
 		return nil, cmdErr
 	}
 	return result, nil
@@ -138,11 +165,11 @@ func RunPSCommand(conf *config.ProviderConf, what, cmd string, opts ...PSOption)
 
 // checkPSResult is the error half of RunPSCommand, split off so it can be
 // tested without a WinRM connection.
-func checkPSResult(result *PSCommandResult, err error, what, password string) error {
+func checkPSResult(result *PSCommandResult, err error, what, password string, secrets ...string) error {
 	if err == nil && (result == nil || result.ExitCode == 0) {
 		return nil
 	}
-	return &psError{what: what, result: result, err: err, password: password}
+	return &psError{what: what, result: result, err: err, password: password, secrets: secrets}
 }
 
 // psError is what a failed command returns.
@@ -164,18 +191,19 @@ type psError struct {
 	result   *PSCommandResult // the raw streams; nil only if Run returned nothing
 	err      error            // set when the command could not be run at all
 	password string
+	secrets  []string
 }
 
 func (e *psError) Error() string {
 	var stderr, stdout string
 	var exitCode int
 	if e.result != nil {
-		stderr = redactSensitiveData(e.result.StdErr, e.password)
-		stdout = redactSensitiveData(e.result.Stdout, e.password)
+		stderr = redactSensitiveData(e.result.StdErr, e.password, e.secrets...)
+		stdout = redactSensitiveData(e.result.Stdout, e.password, e.secrets...)
 		exitCode = e.result.ExitCode
 	}
 	if e.err != nil {
-		msg := fmt.Sprintf("while %s: %s", e.what, redactSensitiveData(e.err.Error(), e.password))
+		msg := fmt.Sprintf("while %s: %s", e.what, redactSensitiveData(e.err.Error(), e.password, e.secrets...))
 		if stderr == "" && stdout == "" {
 			// The command did not run; an exit code and two empty streams would
 			// say nothing but would read as if it had.
@@ -271,7 +299,7 @@ func NewPSCommand(cmds []string, opts CreatePSCommandOpts) *PSCommand {
 
 	cmd := strings.Join(cmds, " ")
 
-	logStr := redactSensitiveData(cmd, opts.Password)
+	logStr := redactSensitiveData(cmd, opts.Password, opts.Secrets...)
 	log.Printf("[DEBUG] Constructing powerrshell command: %s ", logStr)
 
 	res := PSCommand{
@@ -282,9 +310,20 @@ func NewPSCommand(cmds []string, opts CreatePSCommandOpts) *PSCommand {
 	return &res
 }
 
-// redactSensitiveData redacts passwords and other sensitive data from log output
-func redactSensitiveData(cmd string, winrmPassword string) string {
+// redactSensitiveData redacts passwords and other sensitive data from log output.
+//
+// `secrets` are exact substrings a caller registered with the Secret option and
+// are replaced literally, which is the only reliable way: the patterns below
+// anchor on the shape of the rendered command and miss it entirely when a
+// password contains a double quote, or when PowerShell truncated the line.
+func redactSensitiveData(cmd string, winrmPassword string, secrets ...string) string {
 	logStr := cmd
+
+	for _, secret := range secrets {
+		if secret != "" {
+			logStr = strings.ReplaceAll(logStr, secret, "<REDACTED>")
+		}
+	}
 
 	// Redact WinRM password if PassCredentials is enabled
 	if winrmPassword != "" {
@@ -342,8 +381,8 @@ func (p *PSCommand) Run(conf *config.ProviderConf) (*PSCommandResult, error) {
 	log.Printf("[DEBUG] Powershell command exited with code %d", res)
 	if res != 0 {
 		// Redact sensitive data from stdout/stderr before logging
-		redactedStdout := redactSensitiveData(stdout, p.Password)
-		redactedStderr := redactSensitiveData(stderr, p.Password)
+		redactedStdout := redactSensitiveData(stdout, p.Password, p.Secrets...)
+		redactedStderr := redactSensitiveData(stderr, p.Password, p.Secrets...)
 		log.Printf("[DEBUG] Stdout: %s, Stderr: %s", redactedStdout, redactedStderr)
 	}
 
@@ -364,7 +403,7 @@ func (p *PSCommand) Run(conf *config.ProviderConf) (*PSCommandResult, error) {
 		// checkPSResult is the only place that renders a failure, because a
 		// rendered failure is redacted and the markers callers match on have to
 		// be read before that happens.
-		log.Printf("[DEBUG] run error : %s", redactSensitiveData(err.Error(), p.Password))
+		log.Printf("[DEBUG] run error : %s", redactSensitiveData(err.Error(), p.Password, p.Secrets...))
 		return result, err
 	}
 
