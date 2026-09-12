@@ -54,12 +54,16 @@ func TestParseGUIDAcceptsOnlyTheCanonicalForm(t *testing.T) {
 // the test body, so it stayed green when the resource stopped rendering the
 // canonical form — and when the GUID was dropped from the id altogether.
 //
-// uuid.UUID is a [16]byte. A %s verb on it renders raw bytes rather than the
-// canonical text unless String is reached, and that form compiles and vets, so
-// the defect is available and has to be pinned here. Read reads only the token
-// before the first underscore, so the raw-byte form does not corrupt Read; what
-// it corrupts is the resource id itself, which lands in serialised state and is
-// what `terraform import` must be handed back.
+// The assertions are invariants, not a second copy of the expression: two parts
+// on the underscore, the first the literal group GUID, the second parseable, and
+// two calls differing. An expectation computed by calling membershipID would
+// move with any mutation of it and pin nothing.
+//
+// uuid.UUID is a [16]byte, but String has a value receiver, so a %s verb reaches
+// it and no plain spelling prints raw bytes; producing them takes a deliberate
+// u[:] or [16]byte(u). What this guards is therefore the id's shape against any
+// future rewrite of membershipID, not one specific slip — the id lands in
+// serialised state and is what `terraform import` must be handed back.
 func TestMembershipIDIsSplittableAndCanonical(t *testing.T) {
 	const group = "6AC1786C-016F-11D2-945F-00C04FB984F9"
 
