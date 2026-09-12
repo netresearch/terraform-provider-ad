@@ -148,12 +148,9 @@ func (g *GroupMembership) getGroupMembers(conf *config.ProviderConf) ([]*GroupMe
 	psOpts := NewPSCommandOpts(conf)
 	psOpts.ForceArray = true
 	psOpts.JSONOutput = true
-	psCmd := NewPSCommand([]string{cmd}, psOpts)
-	result, err := psCmd.Run(conf)
+	result, err := RunPSCommand(conf, psOpts, "running Get-ADGroupMember", cmd)
 	if err != nil {
-		return nil, fmt.Errorf("while running Get-ADGroupMember: %s", err)
-	} else if result.ExitCode != 0 {
-		return nil, fmt.Errorf("command Get-ADGroupMember exited with a non-zero exit code(%d), stderr: %s, stdout: %s", result.ExitCode, result.StdErr, result.Stdout)
+		return nil, err
 	}
 
 	if strings.TrimSpace(result.Stdout) == "" {
@@ -222,13 +219,8 @@ func (g *GroupMembership) bulkGroupMembersOp(conf *config.ProviderConf, operatio
 		memberList := getMembershipList(chunk)
 		cmd := fmt.Sprintf("%s -Identity %q %s -Confirm:$false", operation, g.GroupGUID, memberList)
 
-		psCmd := NewPSCommand([]string{cmd}, psOpts)
-		result, err := psCmd.Run(conf)
-
-		if err != nil {
-			return fmt.Errorf("while running %s: %s", operation, err)
-		} else if result.ExitCode != 0 {
-			return fmt.Errorf("command %s exited with a non-zero exit code(%d), stderr: %s, stdout: %s", operation, result.ExitCode, result.StdErr, result.Stdout)
+		if _, err := RunPSCommand(conf, psOpts, fmt.Sprintf("running %s", operation), cmd); err != nil {
+			return err
 		}
 	}
 
@@ -271,12 +263,8 @@ func (g *GroupMembership) Create(conf *config.ProviderConf) error {
 	memberList := getMembershipList(g.GroupMembers)
 	cmds := []string{fmt.Sprintf("Add-ADGroupMember -Identity %q -Members %s", g.GroupGUID, memberList)}
 	psOpts := NewPSCommandOpts(conf)
-	psCmd := NewPSCommand(cmds, psOpts)
-	result, err := psCmd.Run(conf)
-	if err != nil {
-		return fmt.Errorf("while running Add-ADGroupMember: %s", err)
-	} else if result.ExitCode != 0 {
-		return fmt.Errorf("command Add-ADGroupMember exited with a non-zero exit code(%d), stderr: %s, stdout: %s", result.ExitCode, result.StdErr, result.Stdout)
+	if _, err := RunPSCommand(conf, psOpts, "running Add-ADGroupMember", cmds...); err != nil {
+		return err
 	}
 
 	return nil
@@ -289,14 +277,10 @@ func (g *GroupMembership) Delete(conf *config.ProviderConf) error {
 	cmd := fmt.Sprintf("Remove-ADGroupMember %q -Members (%s) -Confirm:$false", g.GroupGUID, subcmd.String())
 
 	psOpts := NewPSCommandOpts(conf)
-	psCmd := NewPSCommand([]string{cmd}, psOpts)
-	result, err := psCmd.Run(conf)
-	if err != nil {
-		return fmt.Errorf("while running Remove-ADGroupMember: %s", err)
-	} else if result.ExitCode != 0 && !strings.Contains(result.StdErr, "InvalidData") {
-		return fmt.Errorf("command Remove-ADGroupMember exited with a non-zero exit code(%d), stderr: %s, stdout: %s", result.ExitCode, result.StdErr, result.Stdout)
-	}
-	return nil
+	// A group that has no members left makes Remove-ADGroupMember reject its
+	// empty -Members list, which for a destroy is the state we wanted.
+	_, err := RunPSCommand(conf, psOpts, "running Remove-ADGroupMember", cmd)
+	return CheckDeleteResult(err, "InvalidData")
 }
 
 func NewGroupMembershipFromHost(conf *config.ProviderConf, groupID string) (*GroupMembership, error) {

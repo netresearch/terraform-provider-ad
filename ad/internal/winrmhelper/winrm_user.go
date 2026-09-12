@@ -217,17 +217,12 @@ func (u *User) NewUser(conf *config.ProviderConf) (string, error) {
 
 	psOpts := NewPSCommandOpts(conf)
 	psOpts.JSONOutput = true
-	psCmd := NewPSCommand(cmds, psOpts)
-	result, err := psCmd.Run(conf)
+	result, err := RunPSCommand(conf, psOpts, "creating the user", cmds...)
 	if err != nil {
-		return "", err
-	}
-	if result.ExitCode != 0 {
-		// Logging already handled in Run() method with redaction
-		if strings.Contains(result.StdErr, "AlreadyExists") {
+		if strings.Contains(err.Error(), "AlreadyExists") {
 			return "", fmt.Errorf("there is another User named %q", u.PrincipalName)
 		}
-		return "", fmt.Errorf("command New-ADUser exited with a non-zero exit code %d, stderr: %s", result.ExitCode, result.StdErr)
+		return "", err
 	}
 
 	user, err := unmarshallUser([]byte(result.Stdout), nil)
@@ -357,15 +352,8 @@ func (u *User) ModifyUser(d *schema.ResourceData, conf *config.ProviderConf) err
 
 	if len(cmds) > 1 {
 		psOpts := NewPSCommandOpts(conf)
-		psCmd := NewPSCommand(cmds, psOpts)
-		result, err := psCmd.Run(conf)
-
-		if err != nil {
+		if _, err := RunPSCommand(conf, psOpts, "modifying the user", cmds...); err != nil {
 			return err
-		}
-		if result.ExitCode != 0 {
-			// Logging already handled in Run() method with redaction
-			return fmt.Errorf("command Set-ADUser exited with a non-zero exit code %d, stderr: %s", result.ExitCode, result.StdErr)
 		}
 	}
 
@@ -374,14 +362,8 @@ func (u *User) ModifyUser(d *schema.ResourceData, conf *config.ProviderConf) err
 	if d.HasChange("initial_password") || d.HasChange("initial_password_wo_version") {
 		cmd := fmt.Sprintf("Set-ADAccountPassword -Identity %q -Reset -NewPassword (ConvertTo-SecureString -AsPlainText %q -Force)", u.GUID, u.Password)
 		psOpts := NewPSCommandOpts(conf)
-		psCmd := NewPSCommand([]string{cmd}, psOpts)
-		result, err := psCmd.Run(conf)
-		if err != nil {
+		if _, err := RunPSCommand(conf, psOpts, "setting the user's password", cmd); err != nil {
 			return err
-		}
-		if result.ExitCode != 0 {
-			// Logging already handled in Run() method with redaction
-			return fmt.Errorf("command Set-AccountPassword exited with a non-zero exit code %d, stderr: %s", result.ExitCode, result.StdErr)
 		}
 	}
 
@@ -402,9 +384,8 @@ func (u *User) ModifyUser(d *schema.ResourceData, conf *config.ProviderConf) err
 func (u *User) DeleteUser(conf *config.ProviderConf) error {
 	cmd := fmt.Sprintf("Remove-ADUser -Identity %s -Confirm:$false", u.GUID)
 	psOpts := NewPSCommandOpts(conf)
-	psCmd := NewPSCommand([]string{cmd}, psOpts)
-	result, err := psCmd.Run(conf)
-	return CheckDeleteResult(result, err, "ADIdentityNotFoundException", "user")
+	_, err := RunPSCommand(conf, psOpts, "removing the user", cmd)
+	return CheckDeleteResult(err, "ADIdentityNotFoundException")
 }
 
 func (u *User) getOtherAttributes() (string, error) {
@@ -535,15 +516,9 @@ func GetUserFromHost(conf *config.ProviderConf, guid string, customAttributes []
 	cmd := fmt.Sprintf("Get-ADUser -identity %q -properties *", guid)
 	psOpts := NewPSCommandOpts(conf)
 	psOpts.JSONOutput = true
-	psCmd := NewPSCommand([]string{cmd}, psOpts)
-	result, err := psCmd.Run(conf)
+	result, err := RunPSCommand(conf, psOpts, "retrieving the user", cmd)
 	if err != nil {
 		return nil, err
-	}
-
-	if result.ExitCode != 0 {
-		// Logging already handled in Run() method with redaction
-		return nil, fmt.Errorf("command Get-ADUser exited with a non-zero exit code %d, stderr: %s", result.ExitCode, result.StdErr)
 	}
 
 	u, err := unmarshallUser([]byte(result.Stdout), customAttributes)

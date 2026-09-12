@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"fmt"
 	"log"
-	"strings"
 
 	"github.com/hashicorp/terraform-provider-ad/ad/internal/config"
 
@@ -101,20 +100,13 @@ func RemoveSecIni(conf *config.ProviderConf, cpConn *winrmcp.Winrmcp, gpo *GPO) 
 
 	cmd := fmt.Sprintf(`Remove-Item "%s"`, gptPath)
 	psOpts := NewDomainPSCommandOpts(conf)
-	psCmd := NewPSCommand([]string{cmd}, psOpts)
-	result, err := psCmd.Run(conf)
-	if err != nil {
-		return fmt.Errorf("error while retrieving contents of %q: %s", gptPath, err)
-	}
-
-	if result.ExitCode != 0 {
-		if !strings.Contains(result.StdErr, "ItemNotFoundException") {
-			return fmt.Errorf("error while removing %q: %s", gptPath, err)
-		}
+	_, runErr := RunPSCommand(conf, psOpts, fmt.Sprintf("removing %q", gptPath), cmd)
+	if err := CheckDeleteResult(runErr, "ItemNotFoundException"); err != nil {
+		return err
 	}
 
 	cVer := gpo.computerVersion + 1
-	err = gpo.SetGPOVersions(conf, cpConn, gpo.userVersion, cVer)
+	err := gpo.SetGPOVersions(conf, cpConn, gpo.userVersion, cVer)
 	if err != nil {
 		return err
 	}

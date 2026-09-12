@@ -43,18 +43,12 @@ func (g *GPLink) NewGPLink(conf *config.ProviderConf) (string, error) {
 	}
 	psOpts := NewDomainPSCommandOpts(conf)
 	psOpts.JSONOutput = true
-	psCmd := NewPSCommand(cmds, psOpts)
-	result, err := psCmd.Run(conf)
+	result, err := RunPSCommand(conf, psOpts, "running New-GPLink", cmds...)
 	if err != nil {
-		return "", err
-	}
-
-	if result.ExitCode != 0 {
-		log.Printf("[DEBUG] stderr: %s\nstdout: %s", result.StdErr, result.Stdout)
-		if strings.Contains(result.StdErr, "is already linked") {
+		if strings.Contains(err.Error(), "is already linked") {
 			return "", fmt.Errorf("there is another link between GPO %q and target %q", g.GPOGuid, g.Target)
 		}
-		return "", fmt.Errorf("command New-GPLink exited with a non-zero exit code %d, stderr: %s", result.ExitCode, result.StdErr)
+		return "", err
 	}
 
 	gplink, err := unmarshallNewGPLink([]byte(result.Stdout))
@@ -110,19 +104,8 @@ func (g *GPLink) ModifyGPLink(conf *config.ProviderConf, changes map[string]any)
 func (g *GPLink) RemoveGPLink(conf *config.ProviderConf) error {
 	cmd := fmt.Sprintf("Remove-GPlink -Guid %q -Target %q", g.GPOGuid, g.Target)
 	psOpts := NewDomainPSCommandOpts(conf)
-	psCmd := NewPSCommand([]string{cmd}, psOpts)
-	result, err := psCmd.Run(conf)
-	if err != nil {
-		return fmt.Errorf("while removing GPLink: %s", err)
-	} else if result.ExitCode != 0 {
-		stderr := result.StdErr
-		if strings.Contains(stderr, "GpoLinkNotFound") || strings.Contains(stderr, "GpoWithIdNotFound") || strings.Contains(stderr, "There is no such object on the server") {
-			// Check if the resource is already deleted
-			return nil
-		}
-		return fmt.Errorf("while removing GPLink: %s", stderr)
-	}
-	return nil
+	_, err := RunPSCommand(conf, psOpts, "removing the GPO link", cmd)
+	return CheckDeleteResult(err, "GpoLinkNotFound", "GpoWithIdNotFound", "There is no such object on the server")
 }
 
 // GetGPLinkFromResource returns a GPLink struct populated with data from the
@@ -144,15 +127,9 @@ func GetGPLinkFromHost(conf *config.ProviderConf, gpoGUID, containerGUID string)
 	cmds := []string{fmt.Sprintf("Get-ADObject -filter {ObjectGUID -eq %q} -properties gplink", containerGUID)}
 	psOpts := NewPSCommandOpts(conf)
 	psOpts.JSONOutput = true
-	psCmd := NewPSCommand(cmds, psOpts)
-	result, err := psCmd.Run(conf)
+	result, err := RunPSCommand(conf, psOpts, "running Get-ADObject", cmds...)
 	if err != nil {
-		return nil, fmt.Errorf("while running Get-ADObject: %s", err)
-	}
-
-	if result.ExitCode != 0 {
-		log.Printf("[DEBUG] stderr: %s\nstdout: %s", result.StdErr, result.Stdout)
-		return nil, fmt.Errorf("command New-GPLink exited with a non-zero exit code %d, stderr: %s", result.ExitCode, result.StdErr)
+		return nil, err
 	}
 
 	if result.Stdout == "" {

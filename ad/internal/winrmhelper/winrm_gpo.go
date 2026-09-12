@@ -135,12 +135,8 @@ func (g *GPO) Rename(conf *config.ProviderConf, target string) error {
 	}
 
 	psOpts := NewDomainPSCommandOpts(conf)
-	psCmd := NewPSCommand(cmds, psOpts)
-	result, err := psCmd.Run(conf)
-	if err != nil {
-		return fmt.Errorf("while renaming GPO: %s", err)
-	} else if result != nil && result.ExitCode != 0 {
-		return fmt.Errorf("while renaming GPO stderr: %s", result.StdErr)
+	if _, err := RunPSCommand(conf, psOpts, "renaming the GPO", cmds...); err != nil {
+		return err
 	}
 	return nil
 }
@@ -150,14 +146,8 @@ func (g *GPO) ChangeStatus(conf *config.ProviderConf, status string) error {
 	cmd := fmt.Sprintf(`(%s).GpoStatus = "%s"`, getGPOCmdByGUID(g.ID), status)
 
 	psOpts := NewDomainPSCommandOpts(conf)
-	psCmd := NewPSCommand([]string{cmd}, psOpts)
-	result, err := psCmd.Run(conf)
-	if err != nil {
+	if _, err := RunPSCommand(conf, psOpts, "changing the status of the GPO", cmd); err != nil {
 		return err
-	}
-	if result.ExitCode != 0 {
-		return fmt.Errorf("status update failed with a non zero exit code (%d) stdout: %s stderr:%s",
-			result.ExitCode, result.Stdout, result.StdErr)
 	}
 
 	return nil
@@ -182,17 +172,12 @@ func (g *GPO) NewGPO(conf *config.ProviderConf) (string, error) {
 
 	psOpts := NewDomainPSCommandOpts(conf)
 	psOpts.JSONOutput = true
-	psCmd := NewPSCommand(cmds, psOpts)
-	result, err := psCmd.Run(conf)
+	result, err := RunPSCommand(conf, psOpts, "creating the GPO", cmds...)
 	if err != nil {
-		return "", err
-	}
-	if result.ExitCode != 0 {
-		log.Printf("[DEBUG] stderr: %s\nstdout: %s", result.StdErr, result.Stdout)
-		if strings.Contains(result.StdErr, "GpoWithNameAlreadyExists") {
+		if strings.Contains(err.Error(), "GpoWithNameAlreadyExists") {
 			return "", fmt.Errorf("there is another GPO named %q", g.Name)
 		}
-		return "", fmt.Errorf("command exited with a non-zero exit code %d, stderr: %s", result.ExitCode, result.StdErr)
+		return "", err
 	}
 	gpo, err := unmarshallGPO([]byte(result.Stdout))
 	if err != nil {
@@ -205,9 +190,8 @@ func (g *GPO) NewGPO(conf *config.ProviderConf) (string, error) {
 func (g *GPO) DeleteGPO(conf *config.ProviderConf) error {
 	cmd := fmt.Sprintf("Remove-GPO -Name %s -Domain %s", g.Name, g.Domain)
 	psOpts := NewDomainPSCommandOpts(conf)
-	psCmd := NewPSCommand([]string{cmd}, psOpts)
-	result, err := psCmd.Run(conf)
-	return CheckDeleteResult(result, err, "GpoWithNameNotFound", "GPO")
+	_, err := RunPSCommand(conf, psOpts, "removing the GPO", cmd)
+	return CheckDeleteResult(err, "GpoWithNameNotFound")
 }
 
 // UpdateGPO updates the GPO container
