@@ -89,8 +89,9 @@ func (s *SecuritySettings) PopulateSecuritySettings(d *schema.ResourceData, iniF
 // https://docs.microsoft.com/en-us/openspecs/windows_protocols/ms-gpsb/fa15485d-ae9f-456e-a08f-81f2e5725a7e
 func NewSecuritySettings() *SecuritySettings {
 	sec := &SecuritySettings{
-		Unicode: Unicode{Unicode: "yes"},
-		Version: Version{Signature: "\"$CHICAGO$\"", Revision: 1},
+		Unicode:   Unicode{Unicode: "yes"},
+		Signature: "\"$CHICAGO$\"",
+		Revision:  1,
 	}
 	return sec
 }

@@ -4,7 +4,6 @@ import (
 	"crypto/tls"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
 	"net"
 	"net/http"
@@ -286,7 +285,7 @@ func (c *KerberosTransporter) Post(_ *winrm.Client, request *soap.SoapMessage) (
 		return "", fmt.Errorf("http error while making kerberos authenticated winRM request: %d - %s. %s ", resp.StatusCode, resp.Status, bodyMsg)
 	}
 
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return "", err
 	}

@@ -3,6 +3,7 @@ package winrmhelper
 import (
 	"encoding/json"
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/hashicorp/terraform-provider-ad/ad/internal/config"
@@ -59,12 +60,7 @@ func (g *GroupMember) Matches(other *GroupMember) bool {
 }
 
 func groupExistsInList(g *GroupMember, memberList []*GroupMember) bool {
-	for _, item := range memberList {
-		if g.Matches(item) {
-			return true
-		}
-	}
-	return false
+	return slices.ContainsFunc(memberList, g.Matches)
 }
 
 // ReconcileMemberIdentifiers decides what to write to state for the members the

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -255,14 +256,8 @@ func ErrorMentions(err error, markers ...string) bool {
 	if err == nil {
 		return false
 	}
-	var cmdErr *psError
-	if errors.As(err, &cmdErr) {
-		for _, marker := range markers {
-			if cmdErr.mentions(marker) {
-				return true
-			}
-		}
-		return false
+	if cmdErr, ok := errors.AsType[*psError](err); ok {
+		return slices.ContainsFunc(markers, cmdErr.mentions)
 	}
 	for _, marker := range markers {
 		if marker != "" && strings.Contains(err.Error(), marker) {
