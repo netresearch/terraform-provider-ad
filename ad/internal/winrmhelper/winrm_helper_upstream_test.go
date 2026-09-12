@@ -153,3 +153,30 @@ func TestGetOtherAttributesAcceptsNonStrings(t *testing.T) {
 		})
 	}
 }
+
+// TestSortInnerSliceSortsUnsortedInput pins the sorting itself. The existing
+// end-to-end case above feeds SortInnerSlice a slice that is already in order,
+// so removing the sort leaves its result unchanged and it passes — which a
+// mutation removing the sort demonstrated. Windows returns multi-valued
+// attributes in an order that need not match the configuration, which is the
+// whole reason the function exists.
+func TestSortInnerSliceSortsUnsortedInput(t *testing.T) {
+	sorted := SortInnerSlice(map[string]any{
+		"multi": []any{"delta", "alpha", "charlie", "bravo"},
+	})
+
+	got, ok := sorted["multi"].([]string)
+	if !ok {
+		t.Fatalf("multi: got %T, want []string", sorted["multi"])
+	}
+
+	want := []string{`"alpha"`, `"bravo"`, `"charlie"`, `"delta"`}
+	if len(got) != len(want) {
+		t.Fatalf("got %v, want %v", got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("got %v, want %v", got, want)
+		}
+	}
+}
