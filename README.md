@@ -10,10 +10,16 @@
 
 What this fork changes on top of upstream:
 
+- **Keeps the Active Directory password out of `terraform plan` output** — `ad_user.initial_password` was never marked `Sensitive`, so the password was rendered in cleartext wherever plans are surfaced: CI job logs, pull request comments, Terraform Cloud runs ([GHSA-rj7j-hc27-42gj](https://github.com/netresearch/terraform-provider-ad/security/advisories/GHSA-rj7j-hc27-42gj)).
+- **Adds the write-only `ad_user.initial_password_wo`** — Terraform keeps a write-only value out of state *and* out of the plan file, which `Sensitive` alone cannot do. Requires Terraform 1.11 or later, and only for configurations that use it; `initial_password` keeps working on every version.
+- **Adopts bugfixes stranded in upstream's fork network** — upstream was archived with 42 pull requests unmerged, among them fixes for two provider panics, numeric custom attributes written as `1E+06`, hyphenated attribute names mangled by PowerShell, group memberships too large for the Windows command line, and `cannot_change_password` reading `false` for every account.
+- **Fixes `ad_group_membership` diffing forever** — members named by SAM account name, distinguished name or SID were compared by GUID alone, so any configuration not written in GUIDs proposed removing and re-adding every member on every plan.
 - **Fixes UTF-16 / unicode encoding issues** — from upstream [PR #190](https://github.com/hashicorp/terraform-provider-ad/pull/190) by [@sthetz](https://github.com/sthetz), which was never merged upstream and, now that the repository is archived, never will be.
 - **Adds `username` to the `ad_user` data source**, equivalent to the `-Name` argument.
 - **Unvendors the dependency tree** ([`419b522`](https://github.com/netresearch/terraform-provider-ad/commit/419b5226deda2c227074ca63e28dfbf72986ed72)) and keeps dependencies current, including security updates that upstream stopped receiving.
 - **Releases from our own pipeline** — upstream released through HashiCorp-internal infrastructure that a fork cannot use.
+
+The [CHANGELOG](CHANGELOG.md) has the full list with the reasoning behind each change.
 
 [![Releases](https://img.shields.io/github/release/netresearch/terraform-provider-ad.svg)](https://github.com/netresearch/terraform-provider-ad/releases)
 [![LICENSE](https://img.shields.io/github/license/netresearch/terraform-provider-ad.svg)](https://github.com/netresearch/terraform-provider-ad/blob/main/LICENSE)
@@ -31,13 +37,9 @@ By using the software in this repository (the AD provider), you acknowledge that
 
 ## Requirements
 
-* [Terraform](https://www.terraform.io/downloads.html) version 0.12.x+
+* [Terraform](https://www.terraform.io/downloads.html) version 0.12.x+ — except `ad_user.initial_password_wo`, which is a write-only argument and needs 1.11+
 * [Windows Server](https://www.microsoft.com/en-us/windows-server) 2012R2 or greater
 * [Go](https://golang.org/doc/install) version 1.25.x+ (only to build from source; see `go.mod`)
-
-## Known issues
-
-* **`ad_user` destroy silently no-ops when `Remove-ADUser` is denied.** If the deletion is rejected by AD (for example on accounts protected from accidental deletion, or with insufficient permissions), the destroy step reports success and removes the resource from state while the user object still exists in AD. Until this is fixed (the exit-code check used by other mutators needs to be applied to the delete path), verify deletions out of band, e.g. `Get-ADUser` should raise `ADIdentityNotFoundException` afterwards.
 
 ## Getting Started
 

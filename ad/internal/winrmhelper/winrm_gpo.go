@@ -273,15 +273,8 @@ func (g *GPO) DeleteGPO(conf *config.ProviderConf) error {
 		InvokeCommand:   conf.IsPassCredentialsEnabled(),
 	}
 	psCmd := NewPSCommand([]string{cmd}, psOpts)
-	_, err := psCmd.Run(conf)
-	if err != nil {
-		// Check if the resource is already deleted
-		if strings.Contains(err.Error(), "GpoWithNameNotFound") {
-			return nil
-		}
-		return err
-	}
-	return nil
+	result, err := psCmd.Run(conf)
+	return CheckDeleteResult(result, err, "GpoWithNameNotFound", "GPO")
 }
 
 // UpdateGPO updates the GPO container
