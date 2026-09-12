@@ -40,7 +40,7 @@ func (g *Group) AddGroup(conf *config.ProviderConf) (string, error) {
 	}
 	result, err := RunPSCommand(conf, "creating the group", strings.Join(cmds, " "), JSONOutput())
 	if err != nil {
-		if strings.Contains(err.Error(), "already exists") {
+		if ErrorMentions(err, "already exists") {
 			return "", fmt.Errorf("there is another group named %q", g.Name)
 		}
 		return "", err

@@ -1,8 +1,6 @@
 package ad
 
 import (
-	"strings"
-
 	"github.com/hashicorp/terraform-provider-ad/ad/internal/config"
 
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
@@ -71,7 +69,7 @@ func resourceADGPORead(d *schema.ResourceData, meta any) error {
 	}
 	g, err := winrmhelper.GetGPOFromHost(meta.(*config.ProviderConf), "", d.Id())
 	if err != nil {
-		if strings.Contains(err.Error(), "GpoWithNameNotFound") || strings.Contains(err.Error(), "GpoWithIdNotFound") {
+		if winrmhelper.ErrorMentions(err, "GpoWithNameNotFound", "GpoWithIdNotFound") {
 			d.SetId("")
 			return nil
 		}

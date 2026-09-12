@@ -2,7 +2,6 @@ package ad
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/hashicorp/terraform-provider-ad/ad/internal/config"
 
@@ -70,7 +69,7 @@ func resourceADComputerRead(d *schema.ResourceData, meta any) error {
 
 	computer, err := winrmhelper.NewComputerFromHost(meta.(*config.ProviderConf), d.Id())
 	if err != nil {
-		if strings.Contains(err.Error(), "ObjectNotFound") {
+		if winrmhelper.ErrorMentions(err, "ObjectNotFound") {
 			// Resource no longer exists
 			d.SetId("")
 			return nil

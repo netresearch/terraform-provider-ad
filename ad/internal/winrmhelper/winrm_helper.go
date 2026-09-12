@@ -126,13 +126,8 @@ func SetMachineExtensionNames(conf *config.ProviderConf, gpoDN, value string) er
 // otherwise Terraform drops the resource from state while the object is still
 // in the directory.
 func CheckDeleteResult(err error, alreadyGone ...string) error {
-	if err == nil {
+	if err == nil || ErrorMentions(err, alreadyGone...) {
 		return nil
-	}
-	for _, marker := range alreadyGone {
-		if strings.Contains(err.Error(), marker) {
-			return nil
-		}
 	}
 	return err
 }

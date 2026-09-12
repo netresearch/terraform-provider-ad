@@ -82,7 +82,7 @@ func resourceADGPOSecurityRead(d *schema.ResourceData, meta any) error {
 
 	gpo, err := winrmhelper.GetGPOFromHost(meta.(*config.ProviderConf), "", guid)
 	if err != nil {
-		if strings.Contains(err.Error(), "NotFound") {
+		if winrmhelper.ErrorMentions(err, "NotFound") {
 			log.Printf("[DEBUG] GPO with guid %q not found", guid)
 			d.SetId("")
 			return nil
@@ -93,7 +93,7 @@ func resourceADGPOSecurityRead(d *schema.ResourceData, meta any) error {
 
 	hostSecIni, err := winrmhelper.GetSecIniFromHost(meta.(*config.ProviderConf), gpo)
 	if err != nil {
-		if strings.Contains(err.Error(), "ItemNotFoundException") {
+		if winrmhelper.ErrorMentions(err, "ItemNotFoundException") {
 			log.Printf("[DEBUG] inf file not found, marking resource as gone")
 			d.SetId("")
 			return nil

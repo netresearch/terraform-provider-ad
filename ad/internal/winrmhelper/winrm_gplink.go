@@ -43,7 +43,7 @@ func (g *GPLink) NewGPLink(conf *config.ProviderConf) (string, error) {
 	}
 	result, err := RunPSCommand(conf, "running New-GPLink", strings.Join(cmds, " "), Domain(), JSONOutput())
 	if err != nil {
-		if strings.Contains(err.Error(), "is already linked") {
+		if ErrorMentions(err, "is already linked") {
 			return "", fmt.Errorf("there is another link between GPO %q and target %q", g.GPOGuid, g.Target)
 		}
 		return "", err

@@ -168,7 +168,7 @@ func (g *GPO) NewGPO(conf *config.ProviderConf) (string, error) {
 
 	result, err := RunPSCommand(conf, "creating the GPO", strings.Join(cmds, " "), Domain(), JSONOutput())
 	if err != nil {
-		if strings.Contains(err.Error(), "GpoWithNameAlreadyExists") {
+		if ErrorMentions(err, "GpoWithNameAlreadyExists") {
 			return "", fmt.Errorf("there is another GPO named %q", g.Name)
 		}
 		return "", err

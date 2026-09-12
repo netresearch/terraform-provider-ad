@@ -217,7 +217,7 @@ func (u *User) NewUser(conf *config.ProviderConf) (string, error) {
 
 	result, err := RunPSCommand(conf, "creating the user", strings.Join(cmds, " "), JSONOutput())
 	if err != nil {
-		if strings.Contains(err.Error(), "AlreadyExists") {
+		if ErrorMentions(err, "AlreadyExists") {
 			return "", fmt.Errorf("there is another User named %q", u.PrincipalName)
 		}
 		return "", err

@@ -2,6 +2,7 @@ package winrmhelper
 
 import (
 	"encoding/xml"
+	"errors"
 	"fmt"
 	"log"
 	"regexp"
@@ -123,9 +124,9 @@ func NewPSCommandOpts(conf *config.ProviderConf, opts ...PSOption) CreatePSComma
 // callers used to write out by hand and occasionally forgot.
 //
 // Callers that treat a particular failure as success — a group that already
-// exists, a GPO link that is already gone — match on the returned error, whose
-// text carries the command's stderr in both cases. The result is nil whenever
-// the error is non-nil.
+// exists, a GPO link that is already gone — ask ErrorMentions, never
+// strings.Contains on the error text. The result is nil whenever the error is
+// non-nil.
 func RunPSCommand(conf *config.ProviderConf, what, cmd string, opts ...PSOption) (*PSCommandResult, error) {
 	psOpts := NewPSCommandOpts(conf, opts...)
 	result, err := NewPSCommand([]string{cmd}, psOpts).Run(conf)
@@ -137,23 +138,93 @@ func RunPSCommand(conf *config.ProviderConf, what, cmd string, opts ...PSOption)
 
 // checkPSResult is the error half of RunPSCommand, split off so it can be
 // tested without a WinRM connection.
-//
-// stderr and stdout of a failed command go into the error, and Terraform prints
-// that error to the console and into CI logs. Both can quote the command that
-// produced them, which for New-ADUser and Set-ADAccountPassword is a command
-// carrying a password, so both go through the same redaction Run applies to its
-// debug log.
 func checkPSResult(result *PSCommandResult, err error, what, password string) error {
-	if err != nil {
-		return fmt.Errorf("while %s: %s", what, err)
+	if err == nil && (result == nil || result.ExitCode == 0) {
+		return nil
 	}
-	if result.ExitCode != 0 {
-		return fmt.Errorf("while %s: exit code %d, stderr: %s, stdout: %s",
-			what, result.ExitCode,
-			redactSensitiveData(result.StdErr, password),
-			redactSensitiveData(result.Stdout, password))
+	return &psError{what: what, result: result, err: err, password: password}
+}
+
+// psError is what a failed command returns.
+//
+// It keeps the two readers of a failure apart, because they need opposite
+// things. Error() renders the text a person sees: Terraform prints it to the
+// console and into CI logs, and a PowerShell error record can quote the command
+// that produced it — which for New-ADUser and Set-ADAccountPassword is a command
+// carrying a password. So the rendering is redacted.
+//
+// A caller asking "did the directory say the object was already gone" must read
+// the streams UNREDACTED. Redaction is a literal replacement of the WinRM
+// password, and a password that happens to contain "Not", "Data", "Item" or
+// "Link" rewrites the middle of ADIdentityNotFoundException, GpoLinkNotFound or
+// InvalidData. Matching on the rendered text would then fail to recognise an
+// object that is gone, and the destroy would fail on every retry.
+type psError struct {
+	what     string
+	result   *PSCommandResult // the raw streams; nil only if Run returned nothing
+	err      error            // set when the command could not be run at all
+	password string
+}
+
+func (e *psError) Error() string {
+	var stderr, stdout string
+	var exitCode int
+	if e.result != nil {
+		stderr = redactSensitiveData(e.result.StdErr, e.password)
+		stdout = redactSensitiveData(e.result.Stdout, e.password)
+		exitCode = e.result.ExitCode
 	}
-	return nil
+	if e.err != nil {
+		msg := fmt.Sprintf("while %s: %s", e.what, redactSensitiveData(e.err.Error(), e.password))
+		if stderr == "" && stdout == "" {
+			// The command did not run; an exit code and two empty streams would
+			// say nothing but would read as if it had.
+			return msg
+		}
+		return fmt.Sprintf("%s (exit code %d, stderr: %s, stdout: %s)", msg, exitCode, stderr, stdout)
+	}
+	return fmt.Sprintf("while %s: exit code %d, stderr: %s, stdout: %s",
+		e.what, exitCode, stderr, stdout)
+}
+
+// mentions reports whether the command's raw output, or the transport failure,
+// contains marker.
+func (e *psError) mentions(marker string) bool {
+	if marker == "" {
+		return false
+	}
+	if e.result != nil &&
+		(strings.Contains(e.result.StdErr, marker) || strings.Contains(e.result.Stdout, marker)) {
+		return true
+	}
+	return e.err != nil && strings.Contains(e.err.Error(), marker)
+}
+
+// ErrorMentions reports whether a failed command said any of markers.
+//
+// Use this instead of strings.Contains(err.Error(), …): the rendered error is
+// redacted, and redaction can delete the middle of a marker — see psError. For
+// an error that did not come from a command, the text is all there is, so that
+// is what gets matched.
+func ErrorMentions(err error, markers ...string) bool {
+	if err == nil {
+		return false
+	}
+	var cmdErr *psError
+	if errors.As(err, &cmdErr) {
+		for _, marker := range markers {
+			if cmdErr.mentions(marker) {
+				return true
+			}
+		}
+		return false
+	}
+	for _, marker := range markers {
+		if marker != "" && strings.Contains(err.Error(), marker) {
+			return true
+		}
+	}
+	return false
 }
 
 type PSCommand struct {
@@ -268,12 +339,6 @@ func (p *PSCommand) Run(conf *config.ProviderConf) (*PSCommandResult, error) {
 		stdout, stderr, res, err = localShell.ExecutePScmd(encodedCmd)
 	}
 
-	if err != nil {
-		log.Printf("[DEBUG] run error : %s", err)
-		return nil, fmt.Errorf("powershell command failed with exit code %d\nstdout: %s\nstderr: %s\nerror: %s",
-			res, redactSensitiveData(stdout, p.Password), redactSensitiveData(stderr, p.Password), err)
-	}
-
 	log.Printf("[DEBUG] Powershell command exited with code %d", res)
 	if res != 0 {
 		// Redact sensitive data from stdout/stderr before logging
@@ -292,6 +357,15 @@ func (p *PSCommand) Run(conf *config.ProviderConf) (*PSCommandResult, error) {
 		Stdout:   strings.TrimSpace(stdout),
 		StdErr:   stderr,
 		ExitCode: res,
+	}
+
+	if err != nil {
+		// The streams go back with the error rather than into a message here.
+		// checkPSResult is the only place that renders a failure, because a
+		// rendered failure is redacted and the markers callers match on have to
+		// be read before that happens.
+		log.Printf("[DEBUG] run error : %s", redactSensitiveData(err.Error(), p.Password))
+		return result, err
 	}
 
 	if p.ForceArray && result.Stdout != "" && string(result.Stdout[0]) != "[" {
