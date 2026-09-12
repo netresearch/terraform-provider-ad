@@ -25,6 +25,46 @@ type CreatePSCommandOpts struct {
 	Username        string
 }
 
+// NewPSCommandOpts returns the options with every field that is derived from
+// the provider connection already filled in. Callers set only what differs —
+// JSONOutput, ForceArray, a Server other than the domain controller, and the
+// credential-prefix switches.
+//
+// These five fields were repeated verbatim at more than forty call sites, which
+// is the same boilerplate the duplication detector reports across this package.
+// Keeping them in one place also means a change to how the connection is
+// resolved reaches every command rather than the sites someone remembered.
+func NewPSCommandOpts(conf *config.ProviderConf) CreatePSCommandOpts {
+	return CreatePSCommandOpts{
+		ExecLocally:     conf.IsConnectionTypeLocal(),
+		PassCredentials: conf.IsPassCredentialsEnabled(),
+		Username:        conf.Settings.WinRMUsername,
+		Password:        conf.Settings.WinRMPassword,
+		Server:          conf.IdentifyDomainController(),
+	}
+}
+
+// NewDomainPSCommandOpts returns options aimed at the domain rather than at a
+// specific domain controller, which is what the Group Policy cmdlets need.
+//
+// The domain name falls back to `$env:computername` when it equals the Kerberos
+// realm, and the command runs through Invoke-Command whenever credentials are
+// passed. That resolution was written out at fourteen call sites, all of them
+// identical and none of them using the resolved name for anything but the
+// Server field.
+func NewDomainPSCommandOpts(conf *config.ProviderConf) CreatePSCommandOpts {
+	domainName := conf.Settings.DomainName
+	if conf.Settings.KrbRealm == domainName {
+		domainName = "$env:computername"
+	}
+
+	opts := NewPSCommandOpts(conf)
+	opts.InvokeCommand = conf.IsPassCredentialsEnabled()
+	opts.Server = domainName
+
+	return opts
+}
+
 type PSCommand struct {
 	CreatePSCommandOpts
 	cmd string

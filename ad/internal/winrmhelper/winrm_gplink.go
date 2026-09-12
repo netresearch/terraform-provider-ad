@@ -41,20 +41,8 @@ func (g *GPLink) NewGPLink(conf *config.ProviderConf) (string, error) {
 	if g.Order > 0 {
 		cmds = append(cmds, fmt.Sprintf("-Order %d", g.Order))
 	}
-	domainName := conf.Settings.DomainName
-	if conf.Settings.KrbRealm == domainName {
-		domainName = "$env:computername"
-	}
-	psOpts := CreatePSCommandOpts{
-		JSONOutput:      true,
-		ForceArray:      false,
-		ExecLocally:     conf.IsConnectionTypeLocal(),
-		PassCredentials: conf.IsPassCredentialsEnabled(),
-		Username:        conf.Settings.WinRMUsername,
-		Password:        conf.Settings.WinRMPassword,
-		Server:          domainName,
-		InvokeCommand:   conf.IsPassCredentialsEnabled(),
-	}
+	psOpts := NewDomainPSCommandOpts(conf)
+	psOpts.JSONOutput = true
 	psCmd := NewPSCommand(cmds, psOpts)
 	result, err := psCmd.Run(conf)
 	if err != nil {
@@ -110,20 +98,7 @@ func (g *GPLink) ModifyGPLink(conf *config.ProviderConf, changes map[string]any)
 	if len(cmds) == 1 {
 		return nil
 	}
-	domainName := conf.Settings.DomainName
-	if conf.Settings.KrbRealm == domainName {
-		domainName = "$env:computername"
-	}
-	psOpts := CreatePSCommandOpts{
-		JSONOutput:      false,
-		ForceArray:      false,
-		ExecLocally:     conf.IsConnectionTypeLocal(),
-		PassCredentials: conf.IsPassCredentialsEnabled(),
-		Username:        conf.Settings.WinRMUsername,
-		Password:        conf.Settings.WinRMPassword,
-		Server:          domainName,
-		InvokeCommand:   conf.IsPassCredentialsEnabled(),
-	}
+	psOpts := NewDomainPSCommandOpts(conf)
 	psCmd := NewPSCommand(cmds, psOpts)
 	result, err := psCmd.Run(conf)
 	if err != nil {
@@ -140,20 +115,7 @@ func (g *GPLink) ModifyGPLink(conf *config.ProviderConf, changes map[string]any)
 // RemoveGPLink deletes a link between a GPO and an AD object
 func (g *GPLink) RemoveGPLink(conf *config.ProviderConf) error {
 	cmd := fmt.Sprintf("Remove-GPlink -Guid %q -Target %q", g.GPOGuid, g.Target)
-	domainName := conf.Settings.DomainName
-	if conf.Settings.KrbRealm == domainName {
-		domainName = "$env:computername"
-	}
-	psOpts := CreatePSCommandOpts{
-		JSONOutput:      false,
-		ForceArray:      false,
-		ExecLocally:     conf.IsConnectionTypeLocal(),
-		PassCredentials: conf.IsPassCredentialsEnabled(),
-		Username:        conf.Settings.WinRMUsername,
-		Password:        conf.Settings.WinRMPassword,
-		Server:          domainName,
-		InvokeCommand:   conf.IsPassCredentialsEnabled(),
-	}
+	psOpts := NewDomainPSCommandOpts(conf)
 	psCmd := NewPSCommand([]string{cmd}, psOpts)
 	result, err := psCmd.Run(conf)
 	if err != nil {
@@ -186,15 +148,8 @@ func GetGPLinkFromResource(d *schema.ResourceData) *GPLink {
 // Domain Controller
 func GetGPLinkFromHost(conf *config.ProviderConf, gpoGUID, containerGUID string) (*GPLink, error) {
 	cmds := []string{fmt.Sprintf("Get-ADObject -filter {ObjectGUID -eq %q} -properties gplink", containerGUID)}
-	psOpts := CreatePSCommandOpts{
-		JSONOutput:      true,
-		ForceArray:      false,
-		ExecLocally:     conf.IsConnectionTypeLocal(),
-		PassCredentials: conf.IsPassCredentialsEnabled(),
-		Username:        conf.Settings.WinRMUsername,
-		Password:        conf.Settings.WinRMPassword,
-		Server:          conf.IdentifyDomainController(),
-	}
+	psOpts := NewPSCommandOpts(conf)
+	psOpts.JSONOutput = true
 	psCmd := NewPSCommand(cmds, psOpts)
 	result, err := psCmd.Run(conf)
 	if err != nil {

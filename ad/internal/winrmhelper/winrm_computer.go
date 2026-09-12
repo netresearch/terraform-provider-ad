@@ -43,15 +43,8 @@ func NewComputerFromHost(conf *config.ProviderConf, identity string) (*Computer,
 		return nil, fmt.Errorf("while acquiring winrm client: %s", err)
 	}
 	defer conf.ReleaseWinRMClient(conn)
-	psOpts := CreatePSCommandOpts{
-		JSONOutput:      true,
-		ForceArray:      false,
-		ExecLocally:     conf.IsConnectionTypeLocal(),
-		PassCredentials: conf.IsPassCredentialsEnabled(),
-		Username:        conf.Settings.WinRMUsername,
-		Password:        conf.Settings.WinRMPassword,
-		Server:          conf.IdentifyDomainController(),
-	}
+	psOpts := NewPSCommandOpts(conf)
+	psOpts.JSONOutput = true
 	psCmd := NewPSCommand([]string{cmd}, psOpts)
 	result, err := psCmd.Run(conf)
 	if err != nil {
@@ -89,15 +82,8 @@ func (m *Computer) Create(conf *config.ProviderConf) (string, error) {
 		cmd = fmt.Sprintf("%s -Description %q", cmd, m.Description)
 	}
 
-	psOpts := CreatePSCommandOpts{
-		JSONOutput:      true,
-		ForceArray:      false,
-		ExecLocally:     conf.IsConnectionTypeLocal(),
-		PassCredentials: conf.IsPassCredentialsEnabled(),
-		Username:        conf.Settings.WinRMUsername,
-		Password:        conf.Settings.WinRMPassword,
-		Server:          conf.IdentifyDomainController(),
-	}
+	psOpts := NewPSCommandOpts(conf)
+	psOpts.JSONOutput = true
 	psCmd := NewPSCommand([]string{cmd}, psOpts)
 	result, err := psCmd.Run(conf)
 	if err != nil {
@@ -128,15 +114,8 @@ func (m *Computer) Update(conf *config.ProviderConf, changes map[string]any) err
 			return fmt.Errorf("while acquiring winrm client: %s", err)
 		}
 		defer conf.ReleaseWinRMClient(conn)
-		psOpts := CreatePSCommandOpts{
-			JSONOutput:      true,
-			ForceArray:      false,
-			ExecLocally:     conf.IsConnectionTypeLocal(),
-			PassCredentials: conf.IsPassCredentialsEnabled(),
-			Username:        conf.Settings.WinRMUsername,
-			Password:        conf.Settings.WinRMPassword,
-			Server:          conf.IdentifyDomainController(),
-		}
+		psOpts := NewPSCommandOpts(conf)
+		psOpts.JSONOutput = true
 		psCmd := NewPSCommand([]string{cmd}, psOpts)
 		result, err := psCmd.Run(conf)
 		if err != nil {
@@ -159,15 +138,8 @@ func (m *Computer) Update(conf *config.ProviderConf, changes map[string]any) err
 			return fmt.Errorf("while acquiring winrm client: %s", err)
 		}
 		defer conf.ReleaseWinRMClient(conn)
-		psOpts := CreatePSCommandOpts{
-			JSONOutput:      true,
-			ForceArray:      false,
-			ExecLocally:     conf.IsConnectionTypeLocal(),
-			PassCredentials: conf.IsPassCredentialsEnabled(),
-			Username:        conf.Settings.WinRMUsername,
-			Password:        conf.Settings.WinRMPassword,
-			Server:          conf.IdentifyDomainController(),
-		}
+		psOpts := NewPSCommandOpts(conf)
+		psOpts.JSONOutput = true
 		psCmd := NewPSCommand([]string{cmd}, psOpts)
 		result, err := psCmd.Run(conf)
 		if err != nil {
@@ -189,15 +161,8 @@ func (m *Computer) Delete(conf *config.ProviderConf) error {
 		return fmt.Errorf("while acquiring winrm client: %s", err)
 	}
 	defer conf.ReleaseWinRMClient(conn)
-	psOpts := CreatePSCommandOpts{
-		JSONOutput:      true,
-		ForceArray:      false,
-		ExecLocally:     conf.IsConnectionTypeLocal(),
-		PassCredentials: conf.IsPassCredentialsEnabled(),
-		Username:        conf.Settings.WinRMUsername,
-		Password:        conf.Settings.WinRMPassword,
-		Server:          conf.IdentifyDomainController(),
-	}
+	psOpts := NewPSCommandOpts(conf)
+	psOpts.JSONOutput = true
 	psCmd := NewPSCommand([]string{cmd}, psOpts)
 	result, err := psCmd.Run(conf)
 	if err != nil {
