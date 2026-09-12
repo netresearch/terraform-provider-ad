@@ -91,7 +91,14 @@ func SanitiseString(key string) string {
 		"\v", "`v",
 	)
 	out := cleanupReplacer.Replace(key)
-	log.Printf("[DEBUG] sanitising key %q to: %s", key, out)
+	// Neither the input nor the output may be logged. GetInitialPassword routes
+	// every user password through here, so this line put the plaintext into the
+	// provider log twice under TF_LOG=DEBUG — which is exactly what
+	// initial_password_wo promises does not happen, by a different surface than
+	// state and plan.
+	if out != key {
+		log.Printf("[DEBUG] sanitised a value of %d characters", len(key))
+	}
 	return out
 }
 
