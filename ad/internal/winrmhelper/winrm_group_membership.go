@@ -145,10 +145,7 @@ func getMembershipList(g []*GroupMember) string {
 
 func (g *GroupMembership) getGroupMembers(conf *config.ProviderConf) ([]*GroupMember, error) {
 	cmd := fmt.Sprintf("Get-ADGroupMember -Identity %q", g.GroupGUID)
-	psOpts := NewPSCommandOpts(conf)
-	psOpts.ForceArray = true
-	psOpts.JSONOutput = true
-	result, err := RunPSCommand(conf, psOpts, "running Get-ADGroupMember", cmd)
+	result, err := RunPSCommand(conf, "running Get-ADGroupMember", cmd, JSONOutput(), ForceArray())
 	if err != nil {
 		return nil, err
 	}
@@ -213,13 +210,11 @@ func (g *GroupMembership) bulkGroupMembersOp(conf *config.ProviderConf, operatio
 		return nil
 	}
 
-	psOpts := NewPSCommandOpts(conf)
-
 	for _, chunk := range chunkMembers(members, maxMemberListLength) {
 		memberList := getMembershipList(chunk)
 		cmd := fmt.Sprintf("%s -Identity %q %s -Confirm:$false", operation, g.GroupGUID, memberList)
 
-		if _, err := RunPSCommand(conf, psOpts, fmt.Sprintf("running %s", operation), cmd); err != nil {
+		if _, err := RunPSCommand(conf, fmt.Sprintf("running %s", operation), cmd); err != nil {
 			return err
 		}
 	}
@@ -262,8 +257,7 @@ func (g *GroupMembership) Create(conf *config.ProviderConf) error {
 
 	memberList := getMembershipList(g.GroupMembers)
 	cmds := []string{fmt.Sprintf("Add-ADGroupMember -Identity %q -Members %s", g.GroupGUID, memberList)}
-	psOpts := NewPSCommandOpts(conf)
-	if _, err := RunPSCommand(conf, psOpts, "running Add-ADGroupMember", cmds...); err != nil {
+	if _, err := RunPSCommand(conf, "running Add-ADGroupMember", strings.Join(cmds, " ")); err != nil {
 		return err
 	}
 
@@ -271,15 +265,13 @@ func (g *GroupMembership) Create(conf *config.ProviderConf) error {
 }
 
 func (g *GroupMembership) Delete(conf *config.ProviderConf) error {
-	subCmdOpt := NewPSCommandOpts(conf)
-	subCmdOpt.SkipCredPrefix = true
+	subCmdOpt := NewPSCommandOpts(conf, SkipCredentialPreamble())
 	subcmd := NewPSCommand([]string{fmt.Sprintf("Get-AdGroupMember %q", g.GroupGUID)}, subCmdOpt)
 	cmd := fmt.Sprintf("Remove-ADGroupMember %q -Members (%s) -Confirm:$false", g.GroupGUID, subcmd.String())
 
-	psOpts := NewPSCommandOpts(conf)
 	// A group that has no members left makes Remove-ADGroupMember reject its
 	// empty -Members list, which for a destroy is the state we wanted.
-	_, err := RunPSCommand(conf, psOpts, "running Remove-ADGroupMember", cmd)
+	_, err := RunPSCommand(conf, "running Remove-ADGroupMember", cmd)
 	return CheckDeleteResult(err, "InvalidData")
 }
 

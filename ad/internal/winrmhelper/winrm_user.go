@@ -215,9 +215,7 @@ func (u *User) NewUser(conf *config.ProviderConf) (string, error) {
 		cmds = append(cmds, fmt.Sprintf("-OtherAttributes %s", attrs))
 	}
 
-	psOpts := NewPSCommandOpts(conf)
-	psOpts.JSONOutput = true
-	result, err := RunPSCommand(conf, psOpts, "creating the user", cmds...)
+	result, err := RunPSCommand(conf, "creating the user", strings.Join(cmds, " "), JSONOutput())
 	if err != nil {
 		if strings.Contains(err.Error(), "AlreadyExists") {
 			return "", fmt.Errorf("there is another User named %q", u.PrincipalName)
@@ -351,8 +349,7 @@ func (u *User) ModifyUser(d *schema.ResourceData, conf *config.ProviderConf) err
 	}
 
 	if len(cmds) > 1 {
-		psOpts := NewPSCommandOpts(conf)
-		if _, err := RunPSCommand(conf, psOpts, "modifying the user", cmds...); err != nil {
+		if _, err := RunPSCommand(conf, "modifying the user", strings.Join(cmds, " ")); err != nil {
 			return err
 		}
 	}
@@ -361,8 +358,7 @@ func (u *User) ModifyUser(d *schema.ResourceData, conf *config.ProviderConf) err
 	// own — initial_password_wo_version is the only signal that it changed.
 	if d.HasChange("initial_password") || d.HasChange("initial_password_wo_version") {
 		cmd := fmt.Sprintf("Set-ADAccountPassword -Identity %q -Reset -NewPassword (ConvertTo-SecureString -AsPlainText %q -Force)", u.GUID, u.Password)
-		psOpts := NewPSCommandOpts(conf)
-		if _, err := RunPSCommand(conf, psOpts, "setting the user's password", cmd); err != nil {
+		if _, err := RunPSCommand(conf, "setting the user's password", cmd); err != nil {
 			return err
 		}
 	}
@@ -370,9 +366,7 @@ func (u *User) ModifyUser(d *schema.ResourceData, conf *config.ProviderConf) err
 	if d.HasChange("container") {
 		path := d.Get("container").(string)
 		cmd := fmt.Sprintf("Move-AdObject -Identity %q -TargetPath %q", u.GUID, path)
-		psOpts := NewPSCommandOpts(conf)
-		psOpts.JSONOutput = true
-		if _, err := RunPSCommand(conf, psOpts, "moving the user object", cmd); err != nil {
+		if _, err := RunPSCommand(conf, "moving the user object", cmd); err != nil {
 			return err
 		}
 	}
@@ -383,8 +377,7 @@ func (u *User) ModifyUser(d *schema.ResourceData, conf *config.ProviderConf) err
 // DeleteUser deletes an AD user by calling Remove-ADUser
 func (u *User) DeleteUser(conf *config.ProviderConf) error {
 	cmd := fmt.Sprintf("Remove-ADUser -Identity %s -Confirm:$false", u.GUID)
-	psOpts := NewPSCommandOpts(conf)
-	_, err := RunPSCommand(conf, psOpts, "removing the user", cmd)
+	_, err := RunPSCommand(conf, "removing the user", cmd)
 	return CheckDeleteResult(err, "ADIdentityNotFoundException")
 }
 
@@ -514,9 +507,7 @@ func GetUserFromResource(d *schema.ResourceData) (*User, error) {
 // retrieved from the AD Domain Controller.
 func GetUserFromHost(conf *config.ProviderConf, guid string, customAttributes []string) (*User, error) {
 	cmd := fmt.Sprintf("Get-ADUser -identity %q -properties *", guid)
-	psOpts := NewPSCommandOpts(conf)
-	psOpts.JSONOutput = true
-	result, err := RunPSCommand(conf, psOpts, "retrieving the user", cmd)
+	result, err := RunPSCommand(conf, "retrieving the user", cmd, JSONOutput())
 	if err != nil {
 		return nil, err
 	}

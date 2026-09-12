@@ -43,9 +43,7 @@ func NewComputerFromHost(conf *config.ProviderConf, identity string) (*Computer,
 		return nil, fmt.Errorf("while acquiring winrm client: %s", err)
 	}
 	defer conf.ReleaseWinRMClient(conn)
-	psOpts := NewPSCommandOpts(conf)
-	psOpts.JSONOutput = true
-	result, err := RunPSCommand(conf, psOpts, "retrieving the computer object", cmd)
+	result, err := RunPSCommand(conf, "retrieving the computer object", cmd, JSONOutput())
 	if err != nil {
 		return nil, err
 	}
@@ -77,9 +75,7 @@ func (m *Computer) Create(conf *config.ProviderConf) (string, error) {
 		cmd = fmt.Sprintf("%s -Description %q", cmd, m.Description)
 	}
 
-	psOpts := NewPSCommandOpts(conf)
-	psOpts.JSONOutput = true
-	result, err := RunPSCommand(conf, psOpts, "creating the computer object", cmd)
+	result, err := RunPSCommand(conf, "creating the computer object", cmd, JSONOutput())
 	if err != nil {
 		return "", err
 	}
@@ -104,9 +100,7 @@ func (m *Computer) Update(conf *config.ProviderConf, changes map[string]any) err
 			return fmt.Errorf("while acquiring winrm client: %s", err)
 		}
 		defer conf.ReleaseWinRMClient(conn)
-		psOpts := NewPSCommandOpts(conf)
-		psOpts.JSONOutput = true
-		if _, err := RunPSCommand(conf, psOpts, "moving the computer object", cmd); err != nil {
+		if _, err := RunPSCommand(conf, "moving the computer object", cmd); err != nil {
 			return err
 		}
 	}
@@ -123,9 +117,7 @@ func (m *Computer) Update(conf *config.ProviderConf, changes map[string]any) err
 			return fmt.Errorf("while acquiring winrm client: %s", err)
 		}
 		defer conf.ReleaseWinRMClient(conn)
-		psOpts := NewPSCommandOpts(conf)
-		psOpts.JSONOutput = true
-		if _, err := RunPSCommand(conf, psOpts, "modifying the computer description", cmd); err != nil {
+		if _, err := RunPSCommand(conf, "modifying the computer description", cmd); err != nil {
 			return err
 		}
 	}
@@ -141,9 +133,7 @@ func (m *Computer) Delete(conf *config.ProviderConf) error {
 		return fmt.Errorf("while acquiring winrm client: %s", err)
 	}
 	defer conf.ReleaseWinRMClient(conn)
-	psOpts := NewPSCommandOpts(conf)
-	psOpts.JSONOutput = true
-	if _, err := RunPSCommand(conf, psOpts, "removing the computer object", cmd); err != nil {
+	if _, err := RunPSCommand(conf, "removing the computer object", cmd); err != nil {
 		return err
 	}
 	return nil

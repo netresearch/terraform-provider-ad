@@ -46,8 +46,7 @@ func GetSecIniContents(conf *config.ProviderConf, gpo *GPO) ([]byte, error) {
 	log.Printf("[DEBUG] Getting security settings inf from %s", gptPath)
 
 	cmd := fmt.Sprintf(`Get-Content "%s"`, gptPath)
-	psOpts := NewDomainPSCommandOpts(conf)
-	result, err := RunPSCommand(conf, psOpts, fmt.Sprintf("retrieving contents of %q", gptPath), cmd)
+	result, err := RunPSCommand(conf, fmt.Sprintf("retrieving contents of %q", gptPath), cmd, Domain())
 	if err != nil {
 		return nil, err
 	}
@@ -99,8 +98,7 @@ func RemoveSecIni(conf *config.ProviderConf, cpConn *winrmcp.Winrmcp, gpo *GPO) 
 	log.Printf("[DEBUG] Getting security settings inf from %s", gptPath)
 
 	cmd := fmt.Sprintf(`Remove-Item "%s"`, gptPath)
-	psOpts := NewDomainPSCommandOpts(conf)
-	_, runErr := RunPSCommand(conf, psOpts, fmt.Sprintf("removing %q", gptPath), cmd)
+	_, runErr := RunPSCommand(conf, fmt.Sprintf("removing %q", gptPath), cmd, Domain())
 	if err := CheckDeleteResult(runErr, "ItemNotFoundException"); err != nil {
 		return err
 	}

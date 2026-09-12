@@ -78,9 +78,7 @@ func GetGPOFromHost(conf *config.ProviderConf, name, guid string) (*GPO, error) 
 	} else if guid != "" {
 		cmd = getGPOCmdByGUID(guid)
 	}
-	psOpts := NewDomainPSCommandOpts(conf)
-	psOpts.JSONOutput = true
-	result, err := RunPSCommand(conf, psOpts, "retrieving the GPO", cmd)
+	result, err := RunPSCommand(conf, "retrieving the GPO", cmd, Domain(), JSONOutput())
 	if err != nil {
 		return nil, err
 	}
@@ -134,8 +132,7 @@ func (g *GPO) Rename(conf *config.ProviderConf, target string) error {
 		cmds = append(cmds, fmt.Sprintf("-Domain %s", g.Domain))
 	}
 
-	psOpts := NewDomainPSCommandOpts(conf)
-	if _, err := RunPSCommand(conf, psOpts, "renaming the GPO", cmds...); err != nil {
+	if _, err := RunPSCommand(conf, "renaming the GPO", strings.Join(cmds, " "), Domain()); err != nil {
 		return err
 	}
 	return nil
@@ -145,8 +142,7 @@ func (g *GPO) Rename(conf *config.ProviderConf, target string) error {
 func (g *GPO) ChangeStatus(conf *config.ProviderConf, status string) error {
 	cmd := fmt.Sprintf(`(%s).GpoStatus = "%s"`, getGPOCmdByGUID(g.ID), status)
 
-	psOpts := NewDomainPSCommandOpts(conf)
-	if _, err := RunPSCommand(conf, psOpts, "changing the status of the GPO", cmd); err != nil {
+	if _, err := RunPSCommand(conf, "changing the status of the GPO", cmd, Domain()); err != nil {
 		return err
 	}
 
@@ -170,9 +166,7 @@ func (g *GPO) NewGPO(conf *config.ProviderConf) (string, error) {
 		cmds = append(cmds, fmt.Sprintf("-Comment %q", g.Description))
 	}
 
-	psOpts := NewDomainPSCommandOpts(conf)
-	psOpts.JSONOutput = true
-	result, err := RunPSCommand(conf, psOpts, "creating the GPO", cmds...)
+	result, err := RunPSCommand(conf, "creating the GPO", strings.Join(cmds, " "), Domain(), JSONOutput())
 	if err != nil {
 		if strings.Contains(err.Error(), "GpoWithNameAlreadyExists") {
 			return "", fmt.Errorf("there is another GPO named %q", g.Name)
@@ -189,8 +183,7 @@ func (g *GPO) NewGPO(conf *config.ProviderConf) (string, error) {
 // DeleteGPO delete the GPO container
 func (g *GPO) DeleteGPO(conf *config.ProviderConf) error {
 	cmd := fmt.Sprintf("Remove-GPO -Name %s -Domain %s", g.Name, g.Domain)
-	psOpts := NewDomainPSCommandOpts(conf)
-	_, err := RunPSCommand(conf, psOpts, "removing the GPO", cmd)
+	_, err := RunPSCommand(conf, "removing the GPO", cmd, Domain())
 	return CheckDeleteResult(err, "GpoWithNameNotFound")
 }
 
@@ -217,8 +210,7 @@ func (g *GPO) UpdateGPO(config *config.ProviderConf, d *schema.ResourceData) (st
 // of this function as well as GetsysVolPath to construct the GPO path on the DC's filesystem.
 func (g *GPO) getGPOFilePath(conf *config.ProviderConf) (string, error) {
 	cmd := fmt.Sprintf("(Get-ADObject  -LDAPFilter '(&(objectClass=groupPolicyContainer)(cn={%s}))' -Properties gPCFilesysPath).gPCFilesysPath", g.ID)
-	psOpts := NewDomainPSCommandOpts(conf)
-	result, err := RunPSCommand(conf, psOpts, fmt.Sprintf("retrieving the path of GPO %q", g.ID), cmd)
+	result, err := RunPSCommand(conf, fmt.Sprintf("retrieving the path of GPO %q", g.ID), cmd, Domain())
 	if err != nil {
 		return "", err
 	}
@@ -229,8 +221,7 @@ func (g *GPO) getGPOFilePath(conf *config.ProviderConf) (string, error) {
 // and the value we get from getGPOFilePath is used to construct the GPO path on the DC's filesystem.
 func getSysVolPath(conf *config.ProviderConf) (string, error) {
 	cmd := "(Get-SmbShare sysvol).path"
-	psOpts := NewDomainPSCommandOpts(conf)
-	result, err := RunPSCommand(conf, psOpts, "retrieving the SYSVOL path", cmd)
+	result, err := RunPSCommand(conf, "retrieving the SYSVOL path", cmd, Domain())
 	if err != nil {
 		return "", err
 	}
@@ -257,8 +248,7 @@ func (g *GPO) loadGPOVersions() error {
 // SetADGPOVersions updates AD with the given versions for a GPO
 func (g *GPO) SetADGPOVersions(conf *config.ProviderConf, gpoVersion uint32) error {
 
-	psOpts := NewPSCommandOpts(conf)
-	psOpts.SkipCredPrefix = true
+	psOpts := NewPSCommandOpts(conf, SkipCredentialPreamble())
 
 	tmpCmd := fmt.Sprintf("Get-ADObject  -LDAPFilter '(&(objectClass=groupPolicyContainer)(cn={%s}))' -Properties *", g.ID)
 	cmds := []string{
@@ -267,10 +257,7 @@ func (g *GPO) SetADGPOVersions(conf *config.ProviderConf, gpoVersion uint32) err
 	}
 
 	cmd := strings.Join(cmds, ";")
-	psOpts = NewPSCommandOpts(conf)
-	psOpts.Server = ""
-	psOpts.SkipCredSuffix = true
-	if _, err := RunPSCommand(conf, psOpts, fmt.Sprintf("setting the new version in AD for GPO %q", g.ID), cmd); err != nil {
+	if _, err := RunPSCommand(conf, fmt.Sprintf("setting the new version in AD for GPO %q", g.ID), cmd, ComposedCommand()); err != nil {
 		return err
 	}
 	return nil
@@ -322,8 +309,7 @@ func (g *GPO) loadGPTIni(conf *config.ProviderConf) error {
 	gptPath := fmt.Sprintf("%s\\gpt.ini", g.basePath)
 	log.Printf("[DEBUG] Getting GPT ini from %s", gptPath)
 	cmd := fmt.Sprintf(`Get-Content "%s"`, gptPath)
-	psOpts := NewDomainPSCommandOpts(conf)
-	result, err := RunPSCommand(conf, psOpts, fmt.Sprintf("retrieving contents of %q", gptPath), cmd)
+	result, err := RunPSCommand(conf, fmt.Sprintf("retrieving contents of %q", gptPath), cmd, Domain())
 	if err != nil {
 		return err
 	}

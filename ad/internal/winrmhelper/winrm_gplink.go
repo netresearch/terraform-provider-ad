@@ -41,9 +41,7 @@ func (g *GPLink) NewGPLink(conf *config.ProviderConf) (string, error) {
 	if g.Order > 0 {
 		cmds = append(cmds, fmt.Sprintf("-Order %d", g.Order))
 	}
-	psOpts := NewDomainPSCommandOpts(conf)
-	psOpts.JSONOutput = true
-	result, err := RunPSCommand(conf, psOpts, "running New-GPLink", cmds...)
+	result, err := RunPSCommand(conf, "running New-GPLink", strings.Join(cmds, " "), Domain(), JSONOutput())
 	if err != nil {
 		if strings.Contains(err.Error(), "is already linked") {
 			return "", fmt.Errorf("there is another link between GPO %q and target %q", g.GPOGuid, g.Target)
@@ -92,8 +90,7 @@ func (g *GPLink) ModifyGPLink(conf *config.ProviderConf, changes map[string]any)
 	if len(cmds) == 1 {
 		return nil
 	}
-	psOpts := NewDomainPSCommandOpts(conf)
-	if _, err := RunPSCommand(conf, psOpts, "running Set-GPLink", cmds...); err != nil {
+	if _, err := RunPSCommand(conf, "running Set-GPLink", strings.Join(cmds, " "), Domain()); err != nil {
 		return err
 	}
 
@@ -103,8 +100,7 @@ func (g *GPLink) ModifyGPLink(conf *config.ProviderConf, changes map[string]any)
 // RemoveGPLink deletes a link between a GPO and an AD object
 func (g *GPLink) RemoveGPLink(conf *config.ProviderConf) error {
 	cmd := fmt.Sprintf("Remove-GPlink -Guid %q -Target %q", g.GPOGuid, g.Target)
-	psOpts := NewDomainPSCommandOpts(conf)
-	_, err := RunPSCommand(conf, psOpts, "removing the GPO link", cmd)
+	_, err := RunPSCommand(conf, "removing the GPO link", cmd, Domain())
 	return CheckDeleteResult(err, "GpoLinkNotFound", "GpoWithIdNotFound", "There is no such object on the server")
 }
 
@@ -125,9 +121,7 @@ func GetGPLinkFromResource(d *schema.ResourceData) *GPLink {
 // Domain Controller
 func GetGPLinkFromHost(conf *config.ProviderConf, gpoGUID, containerGUID string) (*GPLink, error) {
 	cmds := []string{fmt.Sprintf("Get-ADObject -filter {ObjectGUID -eq %q} -properties gplink", containerGUID)}
-	psOpts := NewPSCommandOpts(conf)
-	psOpts.JSONOutput = true
-	result, err := RunPSCommand(conf, psOpts, "running Get-ADObject", cmds...)
+	result, err := RunPSCommand(conf, "running Get-ADObject", strings.Join(cmds, " "), JSONOutput())
 	if err != nil {
 		return nil, err
 	}

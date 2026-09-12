@@ -38,9 +38,7 @@ func (g *Group) AddGroup(conf *config.ProviderConf) (string, error) {
 	if g.Description != "" {
 		cmds = append(cmds, fmt.Sprintf("-Description %q", g.Description))
 	}
-	psOpts := NewPSCommandOpts(conf)
-	psOpts.JSONOutput = true
-	result, err := RunPSCommand(conf, psOpts, "creating the group", cmds...)
+	result, err := RunPSCommand(conf, "creating the group", strings.Join(cmds, " "), JSONOutput())
 	if err != nil {
 		if strings.Contains(err.Error(), "already exists") {
 			return "", fmt.Errorf("there is another group named %q", g.Name)
@@ -80,24 +78,21 @@ func (g *Group) ModifyGroup(d *schema.ResourceData, conf *config.ProviderConf) e
 	}
 
 	if len(cmds) > 1 {
-		psOpts := NewPSCommandOpts(conf)
-		if _, err := RunPSCommand(conf, psOpts, "modifying the group", cmds...); err != nil {
+		if _, err := RunPSCommand(conf, "modifying the group", strings.Join(cmds, " ")); err != nil {
 			return err
 		}
 	}
 
 	if d.HasChange("name") {
 		cmd := fmt.Sprintf("Rename-ADObject -Identity %q -NewName %q", g.GUID, d.Get("name").(string))
-		psOpts := NewPSCommandOpts(conf)
-		if _, err := RunPSCommand(conf, psOpts, "renaming the group", cmd); err != nil {
+		if _, err := RunPSCommand(conf, "renaming the group", cmd); err != nil {
 			return err
 		}
 	}
 
 	if d.HasChange("container") {
 		cmd := fmt.Sprintf("Move-ADObject -Identity %q -TargetPath %q", g.GUID, d.Get("container").(string))
-		psOpts := NewPSCommandOpts(conf)
-		if _, err := RunPSCommand(conf, psOpts, "moving the group object", cmd); err != nil {
+		if _, err := RunPSCommand(conf, "moving the group object", cmd); err != nil {
 			return err
 		}
 	}
@@ -108,8 +103,7 @@ func (g *Group) ModifyGroup(d *schema.ResourceData, conf *config.ProviderConf) e
 // DeleteGroup removes a group
 func (g *Group) DeleteGroup(conf *config.ProviderConf) error {
 	cmd := fmt.Sprintf("Remove-ADGroup -Identity %s -Confirm:$false", g.GUID)
-	psOpts := NewPSCommandOpts(conf)
-	_, err := RunPSCommand(conf, psOpts, "removing the group", cmd)
+	_, err := RunPSCommand(conf, "removing the group", cmd)
 	return CheckDeleteResult(err, "ADIdentityNotFoundException")
 }
 
@@ -132,9 +126,7 @@ func GetGroupFromResource(d *schema.ResourceData) *Group {
 // retrieved from the AD Controller.
 func GetGroupFromHost(conf *config.ProviderConf, guid string) (*Group, error) {
 	cmd := fmt.Sprintf("Get-ADGroup -identity %q -properties *", guid)
-	psOpts := NewPSCommandOpts(conf)
-	psOpts.JSONOutput = true
-	result, err := RunPSCommand(conf, psOpts, "retrieving the group", cmd)
+	result, err := RunPSCommand(conf, "retrieving the group", cmd, JSONOutput())
 	if err != nil {
 		return nil, err
 	}

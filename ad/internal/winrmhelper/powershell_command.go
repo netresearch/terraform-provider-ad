@@ -25,48 +25,95 @@ type CreatePSCommandOpts struct {
 	Username        string
 }
 
-// NewPSCommandOpts returns the options with every field that is derived from
-// the provider connection already filled in. Callers set only what differs —
-// JSONOutput, ForceArray, a Server other than the domain controller, and the
-// credential-prefix switches.
+// A PSOption changes one aspect of how a command is built. Everything that
+// follows from the provider connection is filled in by NewPSCommandOpts, so a
+// call site names only what makes it different from an ordinary command.
+type PSOption func(*config.ProviderConf, *CreatePSCommandOpts)
+
+// JSONOutput pipes the command through ConvertTo-Json. Use it where the caller
+// parses stdout as a JSON document, and nowhere else: the append is wasted on a
+// command whose output nobody reads, and it destroys the output of one that
+// returns plain text, such as Get-Content or a path.
+func JSONOutput() PSOption {
+	return func(_ *config.ProviderConf, o *CreatePSCommandOpts) { o.JSONOutput = true }
+}
+
+// ForceArray wraps a single JSON object in brackets, so a caller unmarshalling
+// into a slice gets one element rather than a type error.
+func ForceArray() PSOption {
+	return func(_ *config.ProviderConf, o *CreatePSCommandOpts) { o.ForceArray = true }
+}
+
+// Domain aims the command at the domain rather than at a specific domain
+// controller, which is what the Group Policy cmdlets need.
 //
-// These five fields were repeated verbatim at more than forty call sites, which
-// is the same boilerplate the duplication detector reports across this package.
-// Keeping them in one place also means a change to how the connection is
+// The domain name falls back to `$env:computername` when it equals the Kerberos
+// realm, and the command runs through Invoke-Command whenever credentials are
+// passed.
+func Domain() PSOption {
+	return func(conf *config.ProviderConf, o *CreatePSCommandOpts) {
+		domainName := conf.Settings.DomainName
+		if conf.Settings.KrbRealm == domainName {
+			domainName = "$env:computername"
+		}
+		o.InvokeCommand = conf.IsPassCredentialsEnabled()
+		o.Server = domainName
+	}
+}
+
+// ComposedCommand marks a command assembled from sub-commands that each already
+// carry their own `-Credential` and `-Server`.
+//
+// The two switches travel together for one reason: the wrapper still has to
+// emit the `$Credential` preamble once at the top, but appending `-Credential`
+// or `-Server` again would apply them to the last cmdlet of the pipeline rather
+// than to the whole. Build the sub-commands with SkipCredentialPreamble.
+func ComposedCommand() PSOption {
+	return func(_ *config.ProviderConf, o *CreatePSCommandOpts) {
+		o.Server = ""
+		o.SkipCredSuffix = true
+	}
+}
+
+// SkipCredentialPreamble leaves out the `$User`/`$Password`/`$Credential` lines,
+// for a sub-command that will be embedded in a larger command which emits them.
+func SkipCredentialPreamble() PSOption {
+	return func(_ *config.ProviderConf, o *CreatePSCommandOpts) { o.SkipCredPrefix = true }
+}
+
+// WithoutCredentials runs the command as the connected user. Nothing is added to
+// it — the credential preamble, the `-Credential` suffix and the `-Server`
+// argument are all conditional on credentials being passed.
+func WithoutCredentials() PSOption {
+	return func(_ *config.ProviderConf, o *CreatePSCommandOpts) { o.PassCredentials = false }
+}
+
+// NewPSCommandOpts returns the options for a command against this provider
+// connection, with the given options applied.
+//
+// The five connection-derived fields were repeated verbatim at more than forty
+// call sites. Keeping them here means a change to how the connection is
 // resolved reaches every command rather than the sites someone remembered.
-func NewPSCommandOpts(conf *config.ProviderConf) CreatePSCommandOpts {
-	return CreatePSCommandOpts{
+func NewPSCommandOpts(conf *config.ProviderConf, opts ...PSOption) CreatePSCommandOpts {
+	res := CreatePSCommandOpts{
 		ExecLocally:     conf.IsConnectionTypeLocal(),
 		PassCredentials: conf.IsPassCredentialsEnabled(),
 		Username:        conf.Settings.WinRMUsername,
 		Password:        conf.Settings.WinRMPassword,
 		Server:          conf.IdentifyDomainController(),
 	}
-}
-
-// NewDomainPSCommandOpts returns options aimed at the domain rather than at a
-// specific domain controller, which is what the Group Policy cmdlets need.
-//
-// The domain name falls back to `$env:computername` when it equals the Kerberos
-// realm, and the command runs through Invoke-Command whenever credentials are
-// passed. That resolution was written out at fourteen call sites, all of them
-// identical and none of them using the resolved name for anything but the
-// Server field.
-func NewDomainPSCommandOpts(conf *config.ProviderConf) CreatePSCommandOpts {
-	domainName := conf.Settings.DomainName
-	if conf.Settings.KrbRealm == domainName {
-		domainName = "$env:computername"
+	for _, opt := range opts {
+		opt(conf, &res)
 	}
-
-	opts := NewPSCommandOpts(conf)
-	opts.InvokeCommand = conf.IsPassCredentialsEnabled()
-	opts.Server = domainName
-
-	return opts
+	return res
 }
 
-// RunPSCommand builds and runs one or more PowerShell commands and turns both
-// failure modes into an error naming what was attempted.
+// RunPSCommand builds and runs a PowerShell command and turns both failure
+// modes into an error naming what was attempted.
+//
+// Everything the command needs beyond `cmd` comes from conf; a call site adds
+// an option only where it differs from an ordinary command, which for most of
+// them is not at all.
 //
 // `what` completes the sentence "while …", so it reads as a present participle
 // plus the context the caller has: "creating group %q", "removing the OU".
@@ -79,9 +126,10 @@ func NewDomainPSCommandOpts(conf *config.ProviderConf) CreatePSCommandOpts {
 // exists, a GPO link that is already gone — match on the returned error, whose
 // text carries the command's stderr in both cases. The result is nil whenever
 // the error is non-nil.
-func RunPSCommand(conf *config.ProviderConf, opts CreatePSCommandOpts, what string, cmds ...string) (*PSCommandResult, error) {
-	result, err := NewPSCommand(cmds, opts).Run(conf)
-	if cmdErr := checkPSResult(result, err, what, opts.Password); cmdErr != nil {
+func RunPSCommand(conf *config.ProviderConf, what, cmd string, opts ...PSOption) (*PSCommandResult, error) {
+	psOpts := NewPSCommandOpts(conf, opts...)
+	result, err := NewPSCommand([]string{cmd}, psOpts).Run(conf)
+	if cmdErr := checkPSResult(result, err, what, psOpts.Password); cmdErr != nil {
 		return nil, cmdErr
 	}
 	return result, nil
