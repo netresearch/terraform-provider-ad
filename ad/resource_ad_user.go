@@ -5,7 +5,6 @@ import (
 	"log"
 	"maps"
 	"reflect"
-	"strings"
 
 	"github.com/hashicorp/go-cty/cty"
 	"github.com/hashicorp/terraform-provider-ad/ad/internal/config"
@@ -325,7 +324,7 @@ func resourceADUserRead(d *schema.ResourceData, meta any) error {
 
 	u, err := winrmhelper.GetUserFromHost(meta.(*config.ProviderConf), d.Id(), caKeys)
 	if err != nil {
-		if strings.Contains(err.Error(), "ADIdentityNotFoundException") {
+		if winrmhelper.ErrorMentions(err, "ADIdentityNotFoundException") {
 			d.SetId("")
 			return nil
 		}
@@ -402,7 +401,7 @@ func resourceADUserUpdate(d *schema.ResourceData, meta any) error {
 func resourceADUserDelete(d *schema.ResourceData, meta any) error {
 	u, err := winrmhelper.GetUserFromHost(meta.(*config.ProviderConf), d.Id(), nil)
 	if err != nil {
-		if strings.Contains(err.Error(), "ADIdentityNotFoundException") {
+		if winrmhelper.ErrorMentions(err, "ADIdentityNotFoundException") {
 			return nil
 		}
 		return fmt.Errorf("while retrieving user data from host: %s", err)

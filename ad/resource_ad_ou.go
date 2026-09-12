@@ -1,8 +1,6 @@
 package ad
 
 import (
-	"strings"
-
 	"github.com/hashicorp/terraform-provider-ad/ad/internal/config"
 
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
@@ -63,7 +61,7 @@ func resourceADOURead(d *schema.ResourceData, meta any) error {
 
 	ou, err := winrmhelper.NewOrgUnitFromHost(meta.(*config.ProviderConf), d.Id(), "", "")
 	if err != nil {
-		if strings.Contains(err.Error(), "ObjectNotFound") {
+		if winrmhelper.ErrorMentions(err, "ObjectNotFound") {
 			// Resource no longer exists
 			d.SetId("")
 			return nil

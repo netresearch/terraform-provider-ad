@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"log"
 	"os/exec"
 	"reflect"
 	"sort"
@@ -90,51 +89,44 @@ func SanitiseString(key string) string {
 		"\t", "`t",
 		"\v", "`v",
 	)
-	out := cleanupReplacer.Replace(key)
-	log.Printf("[DEBUG] sanitising key %q to: %s", key, out)
-	return out
+	// Nothing about the value is logged, not even its length or the fact that it
+	// needed escaping. GetInitialPassword routes every user password through
+	// here, so this line used to put the plaintext into the provider log twice
+	// under TF_LOG=DEBUG — exactly what initial_password_wo promises does not
+	// happen, by a different surface than state and plan. A length, and a line
+	// that appears only when something was escaped, are a weaker form of the
+	// same disclosure.
+	return cleanupReplacer.Replace(key)
 }
 
 // SetMachineExtensionNames will add the necessary GUIDs to the GPO's gPCMachineExtensionNames attribute.
 // These are required for the security settings part of a GPO to work.
 func SetMachineExtensionNames(conf *config.ProviderConf, gpoDN, value string) error {
 	cmd := fmt.Sprintf(`Set-ADObject -Identity "%s" -Replace @{gPCMachineExtensionNames="%s"}`, gpoDN, value)
-	psOpts := NewPSCommandOpts(conf)
-	psCmd := NewPSCommand([]string{cmd}, psOpts)
-	result, err := psCmd.Run(conf)
-	if err != nil {
-		return fmt.Errorf("error while setting machine extension names for GPO %q: %s", gpoDN, err)
-	}
-	if result.ExitCode != 0 {
-		return fmt.Errorf("command to set machine extension names for GPO %q failed, stderr: %s, stdout: %s", gpoDN, result.StdErr, result.Stdout)
+	if _, err := RunPSCommand(conf, fmt.Sprintf("setting machine extension names for GPO %q", gpoDN), cmd); err != nil {
+		return err
 	}
 	return nil
 }
 
-// CheckDeleteResult turns the outcome of a destructive PowerShell command into
-// an error, or into nil when the object was already gone.
+// CheckDeleteResult passes a RunPSCommand error through, unless it says the
+// object was already gone — which is a successful destroy.
 //
-// PSCommand.Run reports an error only for transport failures. A command the
-// directory REFUSES — removing an account protected from accidental deletion,
-// removing a GPO without the rights — returns no error and a non-zero exit
-// code, so a caller that only looks at err reports success for a destroy that
-// did not happen, and Terraform drops the resource from state while the object
-// still exists.
+// alreadyGone are the exception texts that mean the object is not there any
+// more: "ADIdentityNotFoundException" for AD objects, "GpoWithNameNotFound" for
+// group policies, "ItemNotFoundException" for a file on SYSVOL.
 //
-// alreadyGone is the exception text that means the object is not there any more,
-// which is a successful destroy: "ADIdentityNotFoundException" for AD objects,
-// "GpoWithNameNotFound" for group policies.
-func CheckDeleteResult(result *PSCommandResult, err error, alreadyGone, what string) error {
-	if err != nil {
-		if strings.Contains(err.Error(), alreadyGone) {
-			return nil
-		}
-		return err
+// The directory reports that in either of two ways, and which one is not the
+// caller's business: as a transport error, or as a non-zero exit code with the
+// text on stderr. RunPSCommand puts both into the error, so one match covers
+// both. A removal the directory REFUSES for any other reason stays an error —
+// otherwise Terraform drops the resource from state while the object is still
+// in the directory.
+func CheckDeleteResult(err error, alreadyGone ...string) error {
+	if err == nil || ErrorMentions(err, alreadyGone...) {
+		return nil
 	}
-	if result.ExitCode != 0 {
-		return fmt.Errorf("while removing %s: stderr: %s", what, result.StdErr)
-	}
-	return nil
+	return err
 }
 
 // PSHashtableEntry formats one `key=value` pair of a PowerShell hashtable
@@ -213,19 +205,15 @@ func SortInnerSlice(m map[string]any) map[string]any {
 }
 
 func UploadFiletoSYSVOL(conf *config.ProviderConf, cpClient *winrmcp.Winrmcp, buf io.Reader, destPath string) error {
-	tmpPathCmd := NewPSCommand([]string{"$randompath=[System.IO.Path]::GetRandomFileName(); echo $env:TMP\\$randompath"}, CreatePSCommandOpts{
-		ForceArray:      false,
-		JSONOutput:      false,
-		ExecLocally:     conf.IsConnectionTypeLocal(),
-		PassCredentials: false,
-		SkipCredPrefix:  true,
-		SkipCredSuffix:  true,
-	})
-	tmpPathResult, err := tmpPathCmd.Run(conf)
+	// SkipCredPrefix and SkipCredSuffix were set here alongside PassCredentials
+	// being false, which makes them dead: the preamble, the -Credential suffix
+	// and the -Server argument are all conditional on credentials being passed.
+	tmpPathResult, err := RunPSCommand(conf,
+		"allocating a temporary path on the host",
+		"$randompath=[System.IO.Path]::GetRandomFileName(); echo $env:TMP\\$randompath",
+		WithoutCredentials())
 	if err != nil {
-		return fmt.Errorf("while renaming GPO: %s", err)
-	} else if tmpPathResult != nil && tmpPathResult.ExitCode != 0 {
-		return fmt.Errorf("while renaming GPO stderr: %s", tmpPathResult.StdErr)
+		return err
 	}
 	tmpPath := tmpPathResult.Stdout
 
@@ -238,22 +226,13 @@ func UploadFiletoSYSVOL(conf *config.ProviderConf, cpClient *winrmcp.Winrmcp, bu
 	x := toks[:len(toks)-1]
 	destDir := strings.Join(x, `\`)
 	mdCmd := fmt.Sprintf(`$check=Test-Path "%s"; if (!$check)  {md "%s"}`, destDir, destDir)
-	domainOpts := NewDomainPSCommandOpts(conf)
-	mdPSComamnd := NewPSCommand([]string{mdCmd}, domainOpts)
-	mdOutput, err := mdPSComamnd.Run(conf)
-	if err != nil {
-		return fmt.Errorf("while renaming GPO: %s", err)
-	} else if mdOutput != nil && mdOutput.ExitCode != 0 {
-		return fmt.Errorf("while renaming GPO stderr: %s", mdOutput.StdErr)
+	if _, err := RunPSCommand(conf, fmt.Sprintf("creating directory %q on SYSVOL", destDir), mdCmd, Domain()); err != nil {
+		return err
 	}
 
 	cpCmd := fmt.Sprintf(`Copy-Item "%s" "%s"; Remove-Item "%s"`, tmpPath, destPath, tmpPath)
-	cpPSComamnd := NewPSCommand([]string{cpCmd}, domainOpts)
-	cpOutput, err := cpPSComamnd.Run(conf)
-	if err != nil {
-		return fmt.Errorf("while renaming GPO: %s", err)
-	} else if cpOutput != nil && cpOutput.ExitCode != 0 {
-		return fmt.Errorf("while renaming GPO stderr: %s", cpOutput.StdErr)
+	if _, err := RunPSCommand(conf, fmt.Sprintf("copying the file to %q", destPath), cpCmd, Domain()); err != nil {
+		return err
 	}
 
 	return nil

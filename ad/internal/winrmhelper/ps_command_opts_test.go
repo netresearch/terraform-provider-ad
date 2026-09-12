@@ -3,7 +3,6 @@ package winrmhelper
 import (
 	"os"
 	"path/filepath"
-	"regexp"
 	"runtime"
 	"strings"
 	"testing"
@@ -85,19 +84,19 @@ func TestNewPSCommandOptsExecLocally(t *testing.T) {
 	}
 }
 
-// TestNewDomainPSCommandOptsTargetsTheDomain pins the second constructor. It
-// differs from the first in exactly two fields, and both matter: aiming Server
-// at the domain rather than a controller is what the Group Policy cmdlets need,
-// and InvokeCommand has to follow the credential setting or a passed-credential
-// run reaches the wrong shell.
-func TestNewDomainPSCommandOptsTargetsTheDomain(t *testing.T) {
+// TestDomainOptionTargetsTheDomain pins the Domain option. It changes exactly
+// two fields, and both matter: aiming Server at the domain rather than a
+// controller is what the Group Policy cmdlets need, and InvokeCommand has to
+// follow the credential setting or a passed-credential run reaches the wrong
+// shell.
+func TestDomainOptionTargetsTheDomain(t *testing.T) {
 	t.Run("ordinary domain", func(t *testing.T) {
 		conf := config.NewProviderConf(&config.Settings{
 			DomainName: "example.com",
 			KrbRealm:   "OTHER.REALM",
 		})
 
-		if got := NewDomainPSCommandOpts(conf).Server; got != "example.com" {
+		if got := NewPSCommandOpts(conf, Domain()).Server; got != "example.com" {
 			t.Errorf("Server = %q, want the domain name", got)
 		}
 	})
@@ -116,12 +115,12 @@ func TestNewDomainPSCommandOptsTargetsTheDomain(t *testing.T) {
 		if !on.IsPassCredentialsEnabled() {
 			t.Fatal("test setup does not enable credential passing")
 		}
-		if !NewDomainPSCommandOpts(on).InvokeCommand {
+		if !NewPSCommandOpts(on, Domain()).InvokeCommand {
 			t.Error("InvokeCommand must be true when credentials are passed")
 		}
 
 		off := config.NewProviderConf(&config.Settings{DomainName: "example.com"})
-		if NewDomainPSCommandOpts(off).InvokeCommand {
+		if NewPSCommandOpts(off, Domain()).InvokeCommand {
 			t.Error("InvokeCommand must be false when credentials are not passed")
 		}
 	})
@@ -134,7 +133,7 @@ func TestNewDomainPSCommandOptsTargetsTheDomain(t *testing.T) {
 			KrbRealm:   "example.com",
 		})
 
-		if got := NewDomainPSCommandOpts(conf).Server; got != "$env:computername" {
+		if got := NewPSCommandOpts(conf, Domain()).Server; got != "$env:computername" {
 			t.Errorf("Server = %q, want $env:computername", got)
 		}
 	})
@@ -147,7 +146,7 @@ func TestNewDomainPSCommandOptsTargetsTheDomain(t *testing.T) {
 			DomainName:    "example.com",
 		})
 
-		opts := NewDomainPSCommandOpts(conf)
+		opts := NewPSCommandOpts(conf, Domain())
 
 		if opts.Username != "svc-terraform" || opts.Password != "hunter2" {
 			t.Errorf("credentials lost: %+v", opts)
@@ -158,9 +157,18 @@ func TestNewDomainPSCommandOptsTargetsTheDomain(t *testing.T) {
 	})
 }
 
-// literalOpts matches a CreatePSCommandOpts literal assigned to a variable —
-// the shape NewPSCommandOpts replaces.
-var literalOpts = regexp.MustCompile(`\w+\s*:?=\s*CreatePSCommandOpts\{`)
+// namesTheOptsType reports whether a line mentions CreatePSCommandOpts at all.
+//
+// This was a regex matching `x := CreatePSCommandOpts{`, which caught exactly
+// one shape out of nine. It could not catch the literal passed straight as an
+// argument — `NewPSCommand(cmds, CreatePSCommandOpts{…})`, which is precisely
+// the site this refactor removed — nor a pointer, a return, a slice or map
+// element, a line-split assignment, or field-by-field assignment after `var`.
+// Outside the exempt file no production line mentions the type for any
+// legitimate reason, so mentioning it at all is the signal.
+func namesTheOptsType(line string) bool {
+	return strings.Contains(line, "CreatePSCommandOpts")
+}
 
 // TestNoHandBuiltPSCommandOpts keeps the boilerplate from growing back.
 //
@@ -169,11 +177,32 @@ var literalOpts = regexp.MustCompile(`\w+\s*:?=\s*CreatePSCommandOpts\{`)
 // miss a field — and the one that matters most is Password, where the zero
 // value is a working struct that authenticates as nobody.
 //
-// Three inline literals in winrm_helper.go are deliberately exempt: they pass
-// the options straight into NewPSCommand and set PassCredentials false with the
-// credential prefix and suffix skipped, which the constructor does not fit.
+// Only the file that defines the type is exempt, because the constructor is the
+// one place that has to build the literal. The exemption used to cover
+// winrm_helper.go as well, for a command run without credentials; that is
+// WithoutCredentials() now.
 func TestNoHandBuiltPSCommandOpts(t *testing.T) {
-	const exempt = "winrm_helper.go"
+	const exempt = "powershell_command.go"
+
+	// A guard with no positive control is a guard that a typo disables in
+	// silence, while the count below still prints a reassuring number. These are
+	// the shapes the previous regex let through.
+	for _, bad := range []string{
+		"\tpsOpts := CreatePSCommandOpts{",
+		"\treturn NewPSCommand(cmds, CreatePSCommandOpts{Username: \"u\"})",
+		"\tp := &CreatePSCommandOpts{Username: \"u\"}",
+		"\treturn CreatePSCommandOpts{Username: \"u\"}",
+		"\tm := map[string]CreatePSCommandOpts{\"a\": {Username: \"u\"}}",
+		"\tvar o CreatePSCommandOpts",
+		"\tpsOpts := CreatePSCommandOpts {",
+	} {
+		if !namesTheOptsType(bad) {
+			t.Fatalf("the guard does not recognise a hand-built literal, so it proves nothing: %q", bad)
+		}
+	}
+	if namesTheOptsType("\tpsOpts := NewPSCommandOpts(conf, JSONOutput())") {
+		t.Fatal("the guard flags the correct form, so every file would fail")
+	}
 
 	entries, err := os.ReadDir(".")
 	if err != nil {
@@ -195,10 +224,10 @@ func TestNoHandBuiltPSCommandOpts(t *testing.T) {
 		}
 
 		for i, line := range strings.Split(string(body), "\n") {
-			if literalOpts.MatchString(line) {
+			if namesTheOptsType(line) {
 				found++
 				t.Errorf("%s:%d builds CreatePSCommandOpts by hand:\n\t%s\n"+
-					"Use NewPSCommandOpts(conf) and assign only what differs.",
+					"Use NewPSCommandOpts(conf, ...) with the options it needs.",
 					name, i+1, strings.TrimSpace(line))
 			}
 		}

@@ -38,20 +38,12 @@ func (g *Group) AddGroup(conf *config.ProviderConf) (string, error) {
 	if g.Description != "" {
 		cmds = append(cmds, fmt.Sprintf("-Description %q", g.Description))
 	}
-	psOpts := NewPSCommandOpts(conf)
-	psOpts.JSONOutput = true
-	psCmd := NewPSCommand(cmds, psOpts)
-	result, err := psCmd.Run(conf)
+	result, err := RunPSCommand(conf, "creating the group", strings.Join(cmds, " "), JSONOutput())
 	if err != nil {
-		return "", err
-	}
-
-	if result.ExitCode != 0 {
-		log.Printf("[DEBUG] stderr: %s\nstdout: %s", result.StdErr, result.Stdout)
-		if strings.Contains(result.StdErr, "already exists") {
+		if ErrorMentions(err, "already exists") {
 			return "", fmt.Errorf("there is another group named %q", g.Name)
 		}
-		return "", fmt.Errorf("command New-ADGroup exited with a non-zero exit code %d, stderr: %s", result.ExitCode, result.StdErr)
+		return "", err
 	}
 
 	group, err := unmarshallGroup([]byte(result.Stdout))
@@ -86,42 +78,22 @@ func (g *Group) ModifyGroup(d *schema.ResourceData, conf *config.ProviderConf) e
 	}
 
 	if len(cmds) > 1 {
-		psOpts := NewPSCommandOpts(conf)
-		psCmd := NewPSCommand(cmds, psOpts)
-		result, err := psCmd.Run(conf)
-		if err != nil {
+		if _, err := RunPSCommand(conf, "modifying the group", strings.Join(cmds, " ")); err != nil {
 			return err
-		}
-		if result.ExitCode != 0 {
-			log.Printf("[DEBUG] stderr: %s\nstdout: %s", result.StdErr, result.Stdout)
-			return fmt.Errorf("command Set-ADGroup exited with a non-zero exit code %d, stderr: %s", result.ExitCode, result.StdErr)
 		}
 	}
 
 	if d.HasChange("name") {
 		cmd := fmt.Sprintf("Rename-ADObject -Identity %q -NewName %q", g.GUID, d.Get("name").(string))
-		psOpts := NewPSCommandOpts(conf)
-		psCmd := NewPSCommand([]string{cmd}, psOpts)
-		result, err := psCmd.Run(conf)
-		if err != nil {
+		if _, err := RunPSCommand(conf, "renaming the group", cmd); err != nil {
 			return err
-		}
-		if result.ExitCode != 0 {
-			log.Printf("[DEBUG] stderr: %s\nstdout: %s", result.StdErr, result.Stdout)
-			return fmt.Errorf("command Rename-ADObject exited with a non-zero exit code %d, stderr: %s", result.ExitCode, result.StdErr)
 		}
 	}
 
 	if d.HasChange("container") {
 		cmd := fmt.Sprintf("Move-ADObject -Identity %q -TargetPath %q", g.GUID, d.Get("container").(string))
-		psOpts := NewPSCommandOpts(conf)
-		psCmd := NewPSCommand([]string{cmd}, psOpts)
-		result, err := psCmd.Run(conf)
-		if err != nil {
-			return fmt.Errorf("winrm execution failure while moving group object: %s", err)
-		}
-		if result.ExitCode != 0 {
-			return fmt.Errorf("Move-ADObject exited with a non zero exit code (%d), stderr: %s", result.ExitCode, result.StdErr)
+		if _, err := RunPSCommand(conf, "moving the group object", cmd); err != nil {
+			return err
 		}
 	}
 
@@ -131,19 +103,8 @@ func (g *Group) ModifyGroup(d *schema.ResourceData, conf *config.ProviderConf) e
 // DeleteGroup removes a group
 func (g *Group) DeleteGroup(conf *config.ProviderConf) error {
 	cmd := fmt.Sprintf("Remove-ADGroup -Identity %s -Confirm:$false", g.GUID)
-	psOpts := NewPSCommandOpts(conf)
-	psCmd := NewPSCommand([]string{cmd}, psOpts)
-	result, err := psCmd.Run(conf)
-	if err != nil {
-		// Check if the resource is already deleted
-		if strings.Contains(err.Error(), "ADIdentityNotFoundException") {
-			return nil
-		}
-		return err
-	} else if result.ExitCode != 0 {
-		return fmt.Errorf("while removing group: stderr: %s", result.StdErr)
-	}
-	return nil
+	_, err := RunPSCommand(conf, "removing the group", cmd)
+	return CheckDeleteResult(err, "ADIdentityNotFoundException")
 }
 
 // GetGroupFromResource returns a Group struct built from Resource data
@@ -165,18 +126,9 @@ func GetGroupFromResource(d *schema.ResourceData) *Group {
 // retrieved from the AD Controller.
 func GetGroupFromHost(conf *config.ProviderConf, guid string) (*Group, error) {
 	cmd := fmt.Sprintf("Get-ADGroup -identity %q -properties *", guid)
-	psOpts := NewPSCommandOpts(conf)
-	psOpts.JSONOutput = true
-	psCmd := NewPSCommand([]string{cmd}, psOpts)
-	result, err := psCmd.Run(conf)
-
+	result, err := RunPSCommand(conf, "retrieving the group", cmd, JSONOutput())
 	if err != nil {
 		return nil, err
-	}
-
-	if result.ExitCode != 0 {
-		log.Printf("[DEBUG] stderr: %s\nstdout: %s", result.StdErr, result.Stdout)
-		return nil, fmt.Errorf("command Get-ADGroup exited with a non-zero exit code %d, stderr: %s", result.ExitCode, result.StdErr)
 	}
 
 	g, err := unmarshallGroup([]byte(result.Stdout))

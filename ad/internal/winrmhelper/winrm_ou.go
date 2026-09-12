@@ -46,15 +46,9 @@ func NewOrgUnitFromHost(conf *config.ProviderConf, guid, name, path string) (*Or
 	} else {
 		return nil, fmt.Errorf("invalid inputs, dn or a combination of path and name are required")
 	}
-	psOpts := NewPSCommandOpts(conf)
-	psOpts.JSONOutput = true
-	psCmd := NewPSCommand([]string{cmd}, psOpts)
-	result, err := psCmd.Run(conf)
+	result, err := RunPSCommand(conf, "retrieving the OU", cmd, JSONOutput())
 	if err != nil {
 		return nil, err
-	}
-	if result.ExitCode != 0 {
-		return nil, fmt.Errorf("Get-ADOrganizationalUnit exited with a non-zero exit code %d, stderr :%s", result.ExitCode, result.StdErr)
 	}
 	ou, err := unmarshallOU([]byte(result.Stdout))
 	if err != nil {
@@ -83,15 +77,9 @@ func (o *OrgUnit) Create(conf *config.ProviderConf) (string, error) {
 	}
 
 	cmd = fmt.Sprintf("%s -ProtectedFromAccidentalDeletion:$%t", cmd, o.Protected)
-	psOpts := NewPSCommandOpts(conf)
-	psOpts.JSONOutput = true
-	psCmd := NewPSCommand([]string{cmd}, psOpts)
-	result, err := psCmd.Run(conf)
+	result, err := RunPSCommand(conf, "creating the OU", cmd, JSONOutput())
 	if err != nil {
 		return "", err
-	}
-	if result.ExitCode != 0 {
-		return "", fmt.Errorf("Get-ADOrganizationalUnit exited with a non-zero exit code %d, stderr :%s", result.ExitCode, result.StdErr)
 	}
 	ou, err := unmarshallOU([]byte(result.Stdout))
 	if err != nil {
@@ -120,15 +108,8 @@ func (o *OrgUnit) Update(conf *config.ProviderConf, changes map[string]any) erro
 	}
 
 	if cmd != "Set-ADOrganizationalUnit -Identity" {
-		psOpts := NewPSCommandOpts(conf)
-		psOpts.JSONOutput = true
-		psCmd := NewPSCommand([]string{cmd}, psOpts)
-		result, err := psCmd.Run(conf)
-		if err != nil {
+		if _, err := RunPSCommand(conf, "modifying the OU", cmd); err != nil {
 			return err
-		}
-		if result.ExitCode != 0 {
-			return fmt.Errorf("Set-ADOrganizationalUnit exited with a non-zero exit code %d, stderr :%s", result.ExitCode, result.StdErr)
 		}
 	}
 
@@ -136,71 +117,36 @@ func (o *OrgUnit) Update(conf *config.ProviderConf, changes map[string]any) erro
 		var unprotected bool
 		if o.Protected == true {
 			cmd := fmt.Sprintf("Set-ADOrganizationalUnit -Identity %q -ProtectedFromAccidentalDeletion:$false", o.GUID)
-			psOpts := NewPSCommandOpts(conf)
-			psOpts.JSONOutput = true
-			psCmd := NewPSCommand([]string{cmd}, psOpts)
-			result, err := psCmd.Run(conf)
-			if err != nil {
-				return fmt.Errorf("winrm execution failure while unprotecting OU object: %s", err)
-			}
-			if result.ExitCode != 0 {
-				return fmt.Errorf("Set-ADOrganizationalUnit exited with a non zero exit code (%d), stderr: %s", result.ExitCode, result.StdErr)
+			if _, err := RunPSCommand(conf, "unprotecting the OU object", cmd); err != nil {
+				return err
 			}
 			unprotected = true
 		}
 
 		cmd := fmt.Sprintf("Move-ADObject -Identity %q -TargetPath %q", o.GUID, path.(string))
-		psOpts := NewPSCommandOpts(conf)
-		psOpts.JSONOutput = true
-		psCmd := NewPSCommand([]string{cmd}, psOpts)
-		result, err := psCmd.Run(conf)
-		if err != nil {
-			return fmt.Errorf("winrm execution failure while moving OU object: %s", err)
-		}
-		if result.ExitCode != 0 {
-			return fmt.Errorf("Move-ADObject exited with a non zero exit code (%d), stderr: %s", result.ExitCode, result.StdErr)
+		if _, err := RunPSCommand(conf, "moving the OU object", cmd); err != nil {
+			return err
 		}
 
 		if unprotected == true {
 			cmd := fmt.Sprintf("Set-ADOrganizationalUnit -Identity %q -ProtectedFromAccidentalDeletion:$true", o.GUID)
-			psOpts := NewPSCommandOpts(conf)
-			psOpts.JSONOutput = true
-			psCmd := NewPSCommand([]string{cmd}, psOpts)
-			result, err := psCmd.Run(conf)
-			if err != nil {
-				return fmt.Errorf("winrm execution failure while protecting OU object: %s", err)
-			}
-			if result.ExitCode != 0 {
-				return fmt.Errorf("Set-ADOrganizationalUnit exited with a non zero exit code (%d), stderr: %s", result.ExitCode, result.StdErr)
+			if _, err := RunPSCommand(conf, "protecting the OU object", cmd); err != nil {
+				return err
 			}
 		}
 	}
 
 	if protected, ok := changes["protected"]; ok {
 		cmd = fmt.Sprintf("Set-ADObject -Identity %s -ProtectedFromAccidentalDeletion:$%t", o.GUID, protected.(bool))
-		psOpts := NewPSCommandOpts(conf)
-		psOpts.JSONOutput = true
-		psCmd := NewPSCommand([]string{cmd}, psOpts)
-		result, err := psCmd.Run(conf)
-		if err != nil {
+		if _, err := RunPSCommand(conf, "updating the OU's protected status", cmd); err != nil {
 			return err
-		}
-		if result.ExitCode != 0 {
-			return fmt.Errorf("Set-ADObject exited with a non-zero exit code (%d) while updating OU's protected status, stderr :%s", result.ExitCode, result.StdErr)
 		}
 	}
 
 	if name, ok := changes["name"]; ok {
 		cmd = fmt.Sprintf("Rename-ADObject -Identity %q %q ", o.GUID, name.(string))
-		psOpts := NewPSCommandOpts(conf)
-		psOpts.JSONOutput = true
-		psCmd := NewPSCommand([]string{cmd}, psOpts)
-		result, err := psCmd.Run(conf)
-		if err != nil {
+		if _, err := RunPSCommand(conf, "renaming the OU", cmd); err != nil {
 			return err
-		}
-		if result.ExitCode != 0 {
-			return fmt.Errorf("Set-ADObject exited with a non-zero exit code (%d) while renaming OU, stderr :%s", result.ExitCode, result.StdErr)
 		}
 	}
 	return nil
@@ -218,25 +164,15 @@ func (o *OrgUnit) Delete(conf *config.ProviderConf) error {
 		"Remove-ADOrganizationalUnit -confirm:$false",
 	}
 
-	psOpts := NewPSCommandOpts(conf)
-	psOpts.SkipCredPrefix = true
+	psOpts := NewPSCommandOpts(conf, SkipCredentialPreamble())
 
 	for _, subCmd := range subCmds {
 		cmds = append(cmds, NewPSCommand([]string{subCmd}, psOpts).String())
 	}
 
 	cmd := strings.Join(cmds, "|")
-	psOpts = NewPSCommandOpts(conf)
-	psOpts.JSONOutput = true
-	psOpts.Server = ""
-	psOpts.SkipCredSuffix = true
-	psCmd := NewPSCommand([]string{cmd}, psOpts)
-	result, err := psCmd.Run(conf)
-	if err != nil {
+	if _, err := RunPSCommand(conf, "removing the OU", cmd, ComposedCommand()); err != nil {
 		return err
-	}
-	if result.ExitCode != 0 {
-		return fmt.Errorf("Get-ADObject -Properties * exited with a non-zero exit code %d, stderr :%s", result.ExitCode, result.StdErr)
 	}
 	return nil
 }

@@ -71,7 +71,7 @@ func resourceADGPLinkRead(d *schema.ResourceData, meta any) error {
 	}
 	gplink, err := winrmhelper.GetGPLinkFromHost(meta.(*config.ProviderConf), idParts[0], idParts[1])
 	if err != nil {
-		if strings.Contains(err.Error(), "did not find") {
+		if winrmhelper.ErrorMentions(err, "did not find") {
 			d.SetId("")
 			return nil
 		}

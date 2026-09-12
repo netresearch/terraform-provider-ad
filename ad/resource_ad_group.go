@@ -2,7 +2,6 @@ package ad
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/hashicorp/terraform-provider-ad/ad/internal/config"
 
@@ -84,7 +83,7 @@ func resourceADGroupCreate(d *schema.ResourceData, meta any) error {
 func resourceADGroupRead(d *schema.ResourceData, meta any) error {
 	g, err := winrmhelper.GetGroupFromHost(meta.(*config.ProviderConf), d.Id())
 	if err != nil {
-		if strings.Contains(err.Error(), "ADIdentityNotFoundException") {
+		if winrmhelper.ErrorMentions(err, "ADIdentityNotFoundException") {
 			d.SetId("")
 			return nil
 		}
@@ -118,7 +117,7 @@ func resourceADGroupUpdate(d *schema.ResourceData, meta any) error {
 func resourceADGroupDelete(d *schema.ResourceData, meta any) error {
 	g, err := winrmhelper.GetGroupFromHost(meta.(*config.ProviderConf), d.Id())
 	if err != nil {
-		if strings.Contains(err.Error(), "ADIdentityNotFoundException") {
+		if winrmhelper.ErrorMentions(err, "ADIdentityNotFoundException") {
 			return nil
 		}
 		return err
