@@ -1,9 +1,8 @@
 package ad
 
 import (
-	"fmt"
+	"strings"
 	"testing"
-	"uuid"
 )
 
 // TestParseGUIDAcceptsOnlyTheCanonicalForm pins the strictness the provider had
@@ -50,16 +49,72 @@ func TestParseGUIDAcceptsOnlyTheCanonicalForm(t *testing.T) {
 	}
 }
 
-// TestGeneratedGUIDIsCanonical pins the shape of what goes into a group
-// membership resource id. uuid.UUID is a [16]byte, so a %s verb renders the raw
-// bytes rather than the canonical text if the String method is ever not the one
-// reached — which compiles, vets, and would put control characters into an id.
-func TestGeneratedGUIDIsCanonical(t *testing.T) {
-	s := fmt.Sprintf("%s", uuid.New())
-	if len(s) != 36 {
-		t.Fatalf("generated id is %d characters, want 36: %q", len(s), s)
+// TestMembershipIDIsSplittableAndCanonical asserts on what the resource builds,
+// not on a copy of it. An earlier version of this test rebuilt the expression in
+// the test body, so it stayed green when the resource stopped rendering the
+// canonical form — and when the GUID was dropped from the id altogether.
+//
+// uuid.UUID is a [16]byte. A %s verb on it renders raw bytes rather than the
+// canonical text unless String is reached, and that form compiles and vets, so
+// the defect is available and has to be pinned here. Read splits the id on the
+// underscore, which makes the raw-byte form corrupting rather than merely ugly.
+func TestMembershipIDIsSplittableAndCanonical(t *testing.T) {
+	const group = "6AC1786C-016F-11D2-945F-00C04FB984F9"
+
+	id := membershipID(group)
+
+	parts := strings.Split(id, "_")
+	if len(parts) != 2 {
+		t.Fatalf("id splits into %d parts on the underscore, want 2: %q", len(parts), id)
 	}
-	if err := parseGUID(s); err != nil {
-		t.Fatalf("generated id is not a canonical GUID: %v (%q)", err, s)
+	if parts[0] != group {
+		t.Errorf("Read would take %q as the group GUID, want %q", parts[0], group)
+	}
+	if err := parseGUID(parts[1]); err != nil {
+		t.Errorf("the unique half is not a canonical GUID: %v (%q)", err, parts[1])
+	}
+
+	// Two calls must differ, or the id is not unique per membership.
+	if other := membershipID(group); other == id {
+		t.Errorf("two ids are identical: %q", id)
+	}
+}
+
+// TestGPOGUIDValidatorRejectsNonGUIDs reaches the ValidateFunc through the
+// resource schema, which is how Terraform reaches it. Without this, deleting the
+// validation from resource_ad_gplink.go left the whole suite green: the only
+// coverage was an acceptance test behind TF_ACC, and CI runs `make test` alone.
+//
+// Its input, "something-horribly-wrong", is 24 characters, so it exercises only
+// the length branch. The cases here cover both branches and the three spellings
+// a bare uuid.Parse would accept.
+func TestGPOGUIDValidatorRejectsNonGUIDs(t *testing.T) {
+	validate := resourceADGPLink().Schema["gpo_guid"].ValidateFunc
+	if validate == nil {
+		t.Fatal("gpo_guid has no ValidateFunc")
+	}
+
+	for _, tc := range []struct {
+		name  string
+		in    string
+		valid bool
+	}{
+		{"canonical", "6AC1786C-016F-11D2-945F-00C04FB984F9", true},
+		{"urn form", "urn:uuid:11111111-2222-3333-4444-555555555555", false},
+		{"unhyphenated", "11111111222233334444555555555555", false},
+		{"brace wrapped", "{11111111-2222-3333-4444-555555555555}", false},
+		{"non hex digit", "11111111-2222-3333-4444-55555555555g", false},
+		{"too short", "something-horribly-wrong", false},
+		{"empty", "", false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			_, errs := validate(tc.in, "gpo_guid")
+			if tc.valid && len(errs) != 0 {
+				t.Errorf("validate(%q) returned %v, want accepted", tc.in, errs)
+			}
+			if !tc.valid && len(errs) == 0 {
+				t.Errorf("validate(%q) returned no error, want rejected", tc.in)
+			}
+		})
 	}
 }

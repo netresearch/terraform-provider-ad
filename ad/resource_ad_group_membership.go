@@ -63,6 +63,15 @@ func resourceADGroupMembershipRead(d *schema.ResourceData, meta any) error {
 	return nil
 }
 
+// membershipID builds the resource id for a group membership: the group's GUID,
+// an underscore, and a fresh GUID that only has to be unique. Read splits the id
+// on that underscore and uses the first token, so neither half may contain one —
+// uuid.UUID is a [16]byte, and a %s verb on it renders raw bytes rather than the
+// canonical text unless String is reached. That form compiles and vets.
+func membershipID(groupGUID string) string {
+	return fmt.Sprintf("%s_%s", groupGUID, uuid.New().String())
+}
+
 func resourceADGroupMembershipCreate(d *schema.ResourceData, meta any) error {
 	gm, err := winrmhelper.NewGroupMembershipFromState(d)
 	if err != nil {
@@ -74,8 +83,7 @@ func resourceADGroupMembershipCreate(d *schema.ResourceData, meta any) error {
 		return err
 	}
 
-	id := fmt.Sprintf("%s_%s", gm.GroupGUID, uuid.New())
-	d.SetId(id)
+	d.SetId(membershipID(gm.GroupGUID))
 
 	return nil
 }
