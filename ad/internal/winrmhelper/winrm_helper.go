@@ -119,6 +119,32 @@ func SetMachineExtensionNames(conf *config.ProviderConf, gpoDN, value string) er
 	return nil
 }
 
+// CheckDeleteResult turns the outcome of a destructive PowerShell command into
+// an error, or into nil when the object was already gone.
+//
+// PSCommand.Run reports an error only for transport failures. A command the
+// directory REFUSES — removing an account protected from accidental deletion,
+// removing a GPO without the rights — returns no error and a non-zero exit
+// code, so a caller that only looks at err reports success for a destroy that
+// did not happen, and Terraform drops the resource from state while the object
+// still exists.
+//
+// alreadyGone is the exception text that means the object is not there any more,
+// which is a successful destroy: "ADIdentityNotFoundException" for AD objects,
+// "GpoWithNameNotFound" for group policies.
+func CheckDeleteResult(result *PSCommandResult, err error, alreadyGone, what string) error {
+	if err != nil {
+		if strings.Contains(err.Error(), alreadyGone) {
+			return nil
+		}
+		return err
+	}
+	if result.ExitCode != 0 {
+		return fmt.Errorf("while removing %s: stderr: %s", what, result.StdErr)
+	}
+	return nil
+}
+
 // PSHashtableEntry formats one `key=value` pair of a PowerShell hashtable
 // literal. The key is single-quoted because PowerShell parses a bare hyphenated
 // key such as ms-DS-ConsistencyGuid as an arithmetic expression, and AD

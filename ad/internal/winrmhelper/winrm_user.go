@@ -446,15 +446,8 @@ func (u *User) DeleteUser(conf *config.ProviderConf) error {
 		Server:          conf.IdentifyDomainController(),
 	}
 	psCmd := NewPSCommand([]string{cmd}, psOpts)
-	_, err := psCmd.Run(conf)
-	if err != nil {
-		// Check if the resource is already deleted
-		if strings.Contains(err.Error(), "ADIdentityNotFoundException") {
-			return nil
-		}
-		return err
-	}
-	return nil
+	result, err := psCmd.Run(conf)
+	return CheckDeleteResult(result, err, "ADIdentityNotFoundException", "user")
 }
 
 func (u *User) getOtherAttributes() (string, error) {

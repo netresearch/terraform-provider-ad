@@ -1,3 +1,8 @@
+## v0.5.1 (netresearch fork, unreleased)
+
+BUGFIXES:
+* **Resource**: `ad_user`, `ad_gpo`: a destroy that Active Directory refuses is an error again. `DeleteUser` and `DeleteGPO` discarded the PowerShell result and never checked its exit code, so a `Remove-ADUser` or `Remove-GPO` rejected by the directory — an account protected from accidental deletion, insufficient permissions — reported success, and Terraform dropped the resource from state while the object still existed. `ad_gpo` was affected the same way and had not been documented as such.
+
 ## v0.5.0 (netresearch fork, September 12, 2026)
 
 FEATURES:
