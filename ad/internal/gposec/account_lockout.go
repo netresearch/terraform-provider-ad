@@ -1,8 +1,8 @@
 package gposec
 
 import (
+	"github.com/go-viper/mapstructure/v2"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
-	"github.com/mitchellh/mapstructure"
 )
 
 // AccountLockout represents the account lockout section of the Security Settings GPO extension

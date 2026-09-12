@@ -6,9 +6,9 @@ import (
 
 	"github.com/hashicorp/terraform-provider-ad/ad/internal/config"
 
-	"github.com/hashicorp/go-uuid"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 	"github.com/hashicorp/terraform-provider-ad/ad/internal/winrmhelper"
+	"uuid"
 )
 
 func resourceADGroupMembership() *schema.Resource {
@@ -63,6 +63,19 @@ func resourceADGroupMembershipRead(d *schema.ResourceData, meta any) error {
 	return nil
 }
 
+// membershipID builds the resource id for a group membership: the group's GUID,
+// an underscore, and a fresh GUID that only has to be unique.
+//
+// Read splits on the first underscore and uses the token before it, so the group
+// half must not contain one; what follows is opaque to Read. The unique half is
+// still built as canonical text rather than left free-form, because uuid.UUID is
+// a [16]byte and a %s verb on it renders raw bytes unless String is reached — a
+// form that compiles and vets, and would put a resource id that is not valid
+// UTF-8 into serialised state and into what `terraform import` has to be given.
+func membershipID(groupGUID string) string {
+	return fmt.Sprintf("%s_%s", groupGUID, uuid.New().String())
+}
+
 func resourceADGroupMembershipCreate(d *schema.ResourceData, meta any) error {
 	gm, err := winrmhelper.NewGroupMembershipFromState(d)
 	if err != nil {
@@ -74,13 +87,7 @@ func resourceADGroupMembershipCreate(d *schema.ResourceData, meta any) error {
 		return err
 	}
 
-	membershipUUID, err := uuid.GenerateUUID()
-	if err != nil {
-		return fmt.Errorf("while generating UUID to use as unique membership ID: %s", err)
-	}
-
-	id := fmt.Sprintf("%s_%s", gm.GroupGUID, membershipUUID)
-	d.SetId(id)
+	d.SetId(membershipID(gm.GroupGUID))
 
 	return nil
 }

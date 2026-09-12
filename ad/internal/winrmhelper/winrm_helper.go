@@ -6,7 +6,7 @@ import (
 	"io"
 	"os/exec"
 	"reflect"
-	"sort"
+	"slices"
 	"strconv"
 	"strings"
 	"syscall"
@@ -195,7 +195,7 @@ func SortInnerSlice(m map[string]any) map[string]any {
 			for idx, attr := range v.([]any) {
 				newVal[idx] = GetString(attr)
 			}
-			sort.Strings(newVal)
+			slices.Sort(newVal)
 			m[k] = newVal
 		} else {
 			m[k] = GetString(v)

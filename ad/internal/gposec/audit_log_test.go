@@ -34,7 +34,7 @@ func TestAuditLogSetResourceData(t *testing.T) {
 	d := r.TestResourceData()
 
 	al := AuditLog{
-		EventLogPolicy: EventLogPolicy{MaximumLogSize: "10"},
+		MaximumLogSize: "10",
 	}
 	err := al.SetResourceData("audit_log", d)
 	if err != nil {
