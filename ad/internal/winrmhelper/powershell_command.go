@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/hashicorp/terraform-provider-ad/ad/internal/config"
@@ -80,26 +81,31 @@ func ComposedCommand() PSOption {
 	}
 }
 
-// Secret registers a value that must not appear in an error or a log.
+// SecretPassword registers a password so that the text it renders to in the
+// command is redacted out of every error and log.
 //
-// `rendered` is the text as it stands IN THE COMMAND, not the raw secret. A
-// password reaches the command through SanitiseString and then %q, so neither
-// the value the user configured nor the sanitised one appears there literally,
-// and a literal replacement only matches what is actually present.
+// It takes the password rather than the rendered text on purpose. The caller
+// embeds strconv.Quote(password), and the rule for what to register from that is
+// not obvious twice in a row: strconv.Quote("") is the two-character string `""`,
+// so registering it unconditionally redacts every empty string literal the
+// provider renders — an attribute set to "", a JSON field, the lot. Keeping the
+// rendering and that exception in one place means a call site cannot get it
+// wrong, and one test covers both sites.
 //
-// This exists because the pattern-based redaction below it cannot be made
-// reliable: it anchors on `-AsPlainText "…" -Force)`, and a password containing
-// a double quote renders as `"pa`" + "`" + `\"ssWord1!"`, which the pattern does
-// not match at all — the full password then reaches the Terraform console. A
-// literal replacement is insensitive to quoting and escaping.
+// This exists because the pattern-based redaction further down cannot be made
+// reliable: it anchors on `-AsPlainText "…" -Force)`, and a password containing a
+// double quote renders with an escaped quote inside that anchor, which the
+// pattern does not match at all — the full password then reaches the Terraform
+// console. A literal replacement is insensitive to quoting and escaping.
 //
-// What it still cannot do: PowerShell truncates a long error line before we ever
-// see it, and a truncated secret has no literal left to match.
-func Secret(rendered string) PSOption {
+// What it still cannot do: PowerShell truncates a long error line before the
+// provider sees it, and a truncated secret has no literal left to match.
+func SecretPassword(password string) PSOption {
 	return func(_ *config.ProviderConf, o *CreatePSCommandOpts) {
-		if rendered != "" {
-			o.Secrets = append(o.Secrets, rendered)
+		if password == "" {
+			return
 		}
+		o.Secrets = append(o.Secrets, strconv.Quote(password))
 	}
 }
 
@@ -483,7 +489,11 @@ func decodeXMLCli(xmlDoc string) (string, error) {
 		var v PSOutput
 		err := xml.Unmarshal([]byte(xmlDoc), &v)
 		if err != nil {
-			return "", fmt.Errorf("while unmarshalling CLIXML document: %s", err)
+			// The caller logs "passing back as is" and assigns the result, so
+			// returning the empty string here discarded the stream instead of
+			// preserving it. A marker in a truncated CLIXML document went with
+			// it, and the destroy that depends on that marker then failed.
+			return xmlDoc, fmt.Errorf("while unmarshalling CLIXML document: %s", err)
 		}
 		xmlDoc = strings.TrimSpace(v.String())
 	}

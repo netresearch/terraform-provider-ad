@@ -138,3 +138,32 @@ func TestPSErrorRendersATransportFailureRedacted(t *testing.T) {
 		t.Errorf("unexpected message: %q", err.Error())
 	}
 }
+
+// decodeXMLCli returned the empty string when the document would not parse,
+// while its caller logged "passing back as is" and assigned the result — so a
+// stderr that was truncated mid-CLIXML was discarded. That stream is where the
+// already-gone markers live, so the destroy that depends on one then failed.
+func TestDecodeXMLCliKeepsStderrItCannotParse(t *testing.T) {
+	truncated := `#< CLIXML<Objs><S>ADIdentityNotFoundException`
+
+	got, err := decodeXMLCli(truncated)
+	if err == nil {
+		t.Fatal("fixture parses cleanly, so this test does not exercise the failure path")
+	}
+	if got == "" {
+		t.Fatal("the undecodable stderr was discarded instead of passed back as is")
+	}
+	if !strings.Contains(got, "ADIdentityNotFoundException") {
+		t.Errorf("the marker did not survive: %q", got)
+	}
+}
+
+func TestDecodeXMLCliDecodesAWellFormedDocument(t *testing.T) {
+	got, err := decodeXMLCli(`#< CLIXML<Objs><S>Remove-ADUser : failed</S></Objs>`)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got != "Remove-ADUser : failed" {
+		t.Errorf("got %q", got)
+	}
+}

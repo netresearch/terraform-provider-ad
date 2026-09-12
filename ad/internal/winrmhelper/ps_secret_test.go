@@ -26,7 +26,7 @@ func TestSecretRedactsAPasswordThePatternsCannotMatch(t *testing.T) {
 	// it stands in the command — the escaped rendering — because that is what
 	// leaks and what the password is trivially recovered from.
 	if !strings.Contains(redactSensitiveData(command, ""), rendered) {
-		t.Fatal("fixture does not reproduce the pattern bypass; the password is already redacted without Secret()")
+		t.Fatal("fixture does not reproduce the pattern bypass; the password is already redacted without SecretPassword()")
 	}
 
 	got := redactSensitiveData(command, "", rendered)
@@ -73,9 +73,9 @@ func TestSecretReachesTheRenderedError(t *testing.T) {
 // registered at a real call site is ever redacted.
 func TestSecretIsCarriedByTheOptions(t *testing.T) {
 	conf := credentialConf(t)
-	opts := NewPSCommandOpts(conf, Secret(`"rendered-secret"`))
+	opts := NewPSCommandOpts(conf, SecretPassword(`rendered-secret`))
 
-	if len(opts.Secrets) != 1 || opts.Secrets[0] != `"rendered-secret"` {
+	if len(opts.Secrets) != 1 || opts.Secrets[0] != strconv.Quote("rendered-secret") {
 		t.Fatalf("Secret did not reach the options: %#v", opts.Secrets)
 	}
 
@@ -94,8 +94,39 @@ func TestSecretIgnoresAnEmptyValue(t *testing.T) {
 	}
 
 	opts := CreatePSCommandOpts{}
-	Secret("")(nil, &opts)
+	SecretPassword("")(nil, &opts)
 	if len(opts.Secrets) != 0 {
-		t.Errorf("an empty secret must not be registered: %v", opts.Secrets)
+		t.Errorf("an absent password must not register a secret: %v", opts.Secrets)
+	}
+}
+
+// strconv.Quote("") is the two-character string `""`, not empty. Registering it
+// would redact every empty string literal the provider renders — an attribute set
+// to "", a JSON field, the lot. SecretPassword takes the password rather than the
+// rendering so that this exception lives in one place instead of at each call
+// site, where it was wrong at both.
+func TestAnAbsentPasswordRegistersNothing(t *testing.T) {
+	if strconv.Quote("") == "" {
+		t.Fatal(`strconv.Quote("") is empty here, so this test cannot exercise the case it exists for`)
+	}
+
+	opts := CreatePSCommandOpts{}
+	SecretPassword("")(nil, &opts)
+	if len(opts.Secrets) != 0 {
+		t.Fatalf("an absent password must register no secret, got %q", opts.Secrets)
+	}
+
+	command := `New-ADUser -Name "bob" -OtherAttributes @{'nick'=""}`
+	if got := redactSensitiveData(command, "", opts.Secrets...); got != command {
+		t.Errorf("an unrelated command was rewritten: %s", got)
+	}
+}
+
+func TestSecretPasswordRegistersTheRendering(t *testing.T) {
+	opts := CreatePSCommandOpts{}
+	SecretPassword(`pa"ssWord1!`)(nil, &opts)
+
+	if len(opts.Secrets) != 1 || opts.Secrets[0] != strconv.Quote(`pa"ssWord1!`) {
+		t.Fatalf("expected the quoted rendering, got %q", opts.Secrets)
 	}
 }
