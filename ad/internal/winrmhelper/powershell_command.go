@@ -98,8 +98,19 @@ func ComposedCommand() PSOption {
 // pattern does not match at all — the full password then reaches the Terraform
 // console. A literal replacement is insensitive to quoting and escaping.
 //
-// What it still cannot do: PowerShell truncates a long error line before the
-// provider sees it, and a truncated secret has no literal left to match.
+// Two gaps remain, both measured rather than assumed, and both in the same
+// place: the `+`-prefixed position message, where PowerShell echoes the command
+// back. A literal cannot match there once the text has been transformed —
+// truncated inside the secret, or reassembled from CLIXML fragments, where
+// psString.UnmarshalText trims each fragment and so inserts or deletes a space
+// inside the value. A sweep of console widths 60-220 over the two commands that
+// carry a password leaks at 31 and 24 widths respectively; 80 and 120 are not
+// among them for those exact shapes, which is luck rather than a defence.
+//
+// Redaction cannot close either — the text arrives already transformed. What
+// would is not emitting the echo: dropping the `+` lines during decoding, or
+// asking the host for a view that omits them. That changes what an operator sees
+// in an error, so it is a decision, not a fix to slip into this commit.
 func SecretPassword(password string) PSOption {
 	return func(_ *config.ProviderConf, o *CreatePSCommandOpts) {
 		if password == "" {
@@ -385,17 +396,21 @@ func (p *PSCommand) Run(conf *config.ProviderConf) (*PSCommandResult, error) {
 	}
 
 	log.Printf("[DEBUG] Powershell command exited with code %d", res)
-	if res != 0 {
-		// Redact sensitive data from stdout/stderr before logging
-		redactedStdout := redactSensitiveData(stdout, p.Password, p.Secrets...)
-		redactedStderr := redactSensitiveData(stderr, p.Password, p.Secrets...)
-		log.Printf("[DEBUG] Stdout: %s, Stderr: %s", redactedStdout, redactedStderr)
-	}
 
 	// Decode stderr here for the error to be human readable if we need to return early
 	stderr, xmlErr := decodeXMLCli(stderr)
 	if xmlErr != nil {
 		log.Printf("[DEBUG] stderr was not serialised as CLIXML, passing back as is")
+	}
+
+	if res != 0 {
+		// Logged AFTER decoding, not before. A registered secret is the text as
+		// it stands in the command; CLIXML carries it XML-encoded, so a password
+		// containing & appears as &amp; and no literal replacement matches it.
+		// Redacting the encoded form put the full password in the provider log.
+		redactedStdout := redactSensitiveData(stdout, p.Password, p.Secrets...)
+		redactedStderr := redactSensitiveData(stderr, p.Password, p.Secrets...)
+		log.Printf("[DEBUG] Stdout: %s, Stderr: %s", redactedStdout, redactedStderr)
 	}
 
 	result := &PSCommandResult{
@@ -450,7 +465,10 @@ type psString string
 func (s *psString) UnmarshalText(text []byte) error {
 	str := string(text)
 	str = strings.TrimSpace(str)
-	if str[0] == '+' && len(str) > 2 {
+	// The length check has to come first: an empty <S></S> element, or one
+	// holding only whitespace, leaves str empty and str[0] panics with an index
+	// out of range — taking the provider down while decoding an error message.
+	if len(str) > 2 && str[0] == '+' {
 		*s = psString(fmt.Sprintf("\n%s", str[2:]))
 	} else {
 		*s = psString(str)

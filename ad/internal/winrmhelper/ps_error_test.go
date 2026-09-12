@@ -167,3 +167,21 @@ func TestDecodeXMLCliDecodesAWellFormedDocument(t *testing.T) {
 		t.Errorf("got %q", got)
 	}
 }
+
+// An empty <S></S> element used to panic: str[0] was indexed before the length
+// check, so decoding an error message took the provider down with an index out
+// of range.
+func TestDecodeXMLCliHandlesEmptyElements(t *testing.T) {
+	for _, doc := range []string{
+		`#< CLIXML<Objs><S></S></Objs>`,
+		`#< CLIXML<Objs><S>   </S></Objs>`,
+		`#< CLIXML<Objs><S></S><S>Remove-ADUser : failed</S></Objs>`,
+		`#< CLIXML<Objs><S>+</S></Objs>`,
+	} {
+		got, err := decodeXMLCli(doc)
+		if err != nil {
+			t.Errorf("decoding %q: %v", doc, err)
+		}
+		_ = got
+	}
+}

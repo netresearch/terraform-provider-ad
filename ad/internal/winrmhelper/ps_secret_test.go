@@ -2,6 +2,8 @@ package winrmhelper
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"testing"
@@ -128,5 +130,58 @@ func TestSecretPasswordRegistersTheRendering(t *testing.T) {
 
 	if len(opts.Secrets) != 1 || opts.Secrets[0] != strconv.Quote(`pa"ssWord1!`) {
 		t.Fatalf("expected the quoted rendering, got %q", opts.Secrets)
+	}
+}
+
+// Registering a secret is opt-in per call site, so a new command that embeds a
+// password is one forgotten option away from printing it. This is the guard:
+// any production file that builds a -AsPlainText command must also register it.
+//
+// Crude on purpose — the alternative is a type that cannot be constructed
+// without a secret, which is a larger change than this package needs today.
+func TestEveryCommandCarryingAPasswordRegistersIt(t *testing.T) {
+	// Positive control: the guard must recognise the shape it looks for, or a
+	// rename silently disables it and the count below still looks reassuring.
+	if !strings.Contains(`-AccountPassword (ConvertTo-SecureString -AsPlainText %s -Force)`, "-AsPlainText") {
+		t.Fatal("the guard no longer recognises the command shape it exists for")
+	}
+
+	entries, err := os.ReadDir(".")
+	if err != nil {
+		t.Fatalf("reading package directory: %v", err)
+	}
+
+	checked := 0
+	for _, e := range entries {
+		name := e.Name()
+		if e.IsDir() || !strings.HasSuffix(name, ".go") || strings.HasSuffix(name, "_test.go") {
+			continue
+		}
+		body, err := os.ReadFile(filepath.Clean(name))
+		if err != nil {
+			t.Fatalf("reading %s: %v", name, err)
+		}
+		text := string(body)
+
+		// The credential preamble uses -AsPlainText for the WinRM password, which
+		// redactSensitiveData replaces literally from opts.Password.
+		if !strings.Contains(text, "-AsPlainText") || name == "powershell_command.go" {
+			continue
+		}
+		// Counted, not merely present: a file with two password commands and one
+		// registration passes a presence check while one command still prints its
+		// password.
+		checked++
+		embeds := strings.Count(text, "-AsPlainText")
+		registers := strings.Count(text, "SecretPassword(")
+		if registers < embeds {
+			t.Errorf("%s embeds %d password commands but registers %d secrets; "+
+				"pass SecretPassword(<the password>) to RunPSCommand at each one",
+				name, embeds, registers)
+		}
+	}
+
+	if checked == 0 {
+		t.Fatal("no file embedding a password was inspected, so this guard proved nothing")
 	}
 }

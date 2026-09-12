@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"log"
 	"os/exec"
 	"reflect"
 	"sort"
@@ -90,16 +89,14 @@ func SanitiseString(key string) string {
 		"\t", "`t",
 		"\v", "`v",
 	)
-	out := cleanupReplacer.Replace(key)
-	// Neither the input nor the output may be logged. GetInitialPassword routes
-	// every user password through here, so this line put the plaintext into the
-	// provider log twice under TF_LOG=DEBUG — which is exactly what
-	// initial_password_wo promises does not happen, by a different surface than
-	// state and plan.
-	if out != key {
-		log.Printf("[DEBUG] sanitised a value of %d characters", len(key))
-	}
-	return out
+	// Nothing about the value is logged, not even its length or the fact that it
+	// needed escaping. GetInitialPassword routes every user password through
+	// here, so this line used to put the plaintext into the provider log twice
+	// under TF_LOG=DEBUG — exactly what initial_password_wo promises does not
+	// happen, by a different surface than state and plan. A length, and a line
+	// that appears only when something was escaped, are a weaker form of the
+	// same disclosure.
+	return cleanupReplacer.Replace(key)
 }
 
 // SetMachineExtensionNames will add the necessary GUIDs to the GPO's gPCMachineExtensionNames attribute.
