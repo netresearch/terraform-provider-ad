@@ -39,7 +39,7 @@ By using the software in this repository (the AD provider), you acknowledge that
 
 * [Terraform](https://www.terraform.io/downloads.html) version 0.12.x+ — except `ad_user.initial_password_wo`, which is a write-only argument and needs 1.11+
 * [Windows Server](https://www.microsoft.com/en-us/windows-server) 2012R2 or greater
-* [Go](https://golang.org/doc/install) version 1.25.x+ (only to build from source; see `go.mod`)
+* [Go](https://golang.org/doc/install) version 1.27.x+ (only to build from source; see `go.mod`)
 
 ## Getting Started
 
