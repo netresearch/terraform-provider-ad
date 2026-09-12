@@ -115,13 +115,8 @@ func (g *Group) ModifyGroup(d *schema.ResourceData, conf *config.ProviderConf) e
 	if d.HasChange("container") {
 		cmd := fmt.Sprintf("Move-ADObject -Identity %q -TargetPath %q", g.GUID, d.Get("container").(string))
 		psOpts := NewPSCommandOpts(conf)
-		psCmd := NewPSCommand([]string{cmd}, psOpts)
-		result, err := psCmd.Run(conf)
-		if err != nil {
-			return fmt.Errorf("winrm execution failure while moving group object: %s", err)
-		}
-		if result.ExitCode != 0 {
-			return fmt.Errorf("Move-ADObject exited with a non zero exit code (%d), stderr: %s", result.ExitCode, result.StdErr)
+		if _, err := RunPSCommand(conf, psOpts, "moving the group object", cmd); err != nil {
+			return err
 		}
 	}
 

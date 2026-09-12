@@ -45,14 +45,9 @@ func NewComputerFromHost(conf *config.ProviderConf, identity string) (*Computer,
 	defer conf.ReleaseWinRMClient(conn)
 	psOpts := NewPSCommandOpts(conf)
 	psOpts.JSONOutput = true
-	psCmd := NewPSCommand([]string{cmd}, psOpts)
-	result, err := psCmd.Run(conf)
+	result, err := RunPSCommand(conf, psOpts, "retrieving the computer object", cmd)
 	if err != nil {
-		return nil, fmt.Errorf("winrm execution failure in NewComputerFromHost: %s", err)
-	}
-
-	if result.ExitCode != 0 {
-		return nil, fmt.Errorf("Get-ADComputer exited with a non zero exit code (%d), stderr: %s", result.ExitCode, result.StdErr)
+		return nil, err
 	}
 	computer, err := unmarshallComputer([]byte(result.Stdout))
 	if err != nil {
@@ -84,14 +79,9 @@ func (m *Computer) Create(conf *config.ProviderConf) (string, error) {
 
 	psOpts := NewPSCommandOpts(conf)
 	psOpts.JSONOutput = true
-	psCmd := NewPSCommand([]string{cmd}, psOpts)
-	result, err := psCmd.Run(conf)
+	result, err := RunPSCommand(conf, psOpts, "creating the computer object", cmd)
 	if err != nil {
-		return "", fmt.Errorf("winrm execution failure while creating computer object: %s", err)
-	}
-
-	if result.ExitCode != 0 {
-		return "", fmt.Errorf("New-ADComputer exited with a non zero exit code (%d), stderr: %s", result.ExitCode, result.StdErr)
+		return "", err
 	}
 	computer, err := unmarshallComputer([]byte(result.Stdout))
 	if err != nil {
@@ -116,13 +106,8 @@ func (m *Computer) Update(conf *config.ProviderConf, changes map[string]any) err
 		defer conf.ReleaseWinRMClient(conn)
 		psOpts := NewPSCommandOpts(conf)
 		psOpts.JSONOutput = true
-		psCmd := NewPSCommand([]string{cmd}, psOpts)
-		result, err := psCmd.Run(conf)
-		if err != nil {
-			return fmt.Errorf("winrm execution failure while moving computer object: %s", err)
-		}
-		if result.ExitCode != 0 {
-			return fmt.Errorf("Move-ADObject exited with a non zero exit code (%d), stderr: %s", result.ExitCode, result.StdErr)
+		if _, err := RunPSCommand(conf, psOpts, "moving the computer object", cmd); err != nil {
+			return err
 		}
 	}
 
@@ -140,13 +125,8 @@ func (m *Computer) Update(conf *config.ProviderConf, changes map[string]any) err
 		defer conf.ReleaseWinRMClient(conn)
 		psOpts := NewPSCommandOpts(conf)
 		psOpts.JSONOutput = true
-		psCmd := NewPSCommand([]string{cmd}, psOpts)
-		result, err := psCmd.Run(conf)
-		if err != nil {
-			return fmt.Errorf("winrm execution failure while modifying computer description: %s", err)
-		}
-		if result.ExitCode != 0 {
-			return fmt.Errorf("Set-ADComputer exited with a non zero exit code (%d), stderr: %s", result.ExitCode, result.StdErr)
+		if _, err := RunPSCommand(conf, psOpts, "modifying the computer description", cmd); err != nil {
+			return err
 		}
 	}
 
@@ -163,13 +143,8 @@ func (m *Computer) Delete(conf *config.ProviderConf) error {
 	defer conf.ReleaseWinRMClient(conn)
 	psOpts := NewPSCommandOpts(conf)
 	psOpts.JSONOutput = true
-	psCmd := NewPSCommand([]string{cmd}, psOpts)
-	result, err := psCmd.Run(conf)
-	if err != nil {
-		return fmt.Errorf("winrm execution failure while removing computer object: %s", err)
-	}
-	if result.ExitCode != 0 {
-		return fmt.Errorf("Remove-ADComputer exited with a non zero exit code (%d), stderr: %s", result.ExitCode, result.StdErr)
+	if _, err := RunPSCommand(conf, psOpts, "removing the computer object", cmd); err != nil {
+		return err
 	}
 	return nil
 }

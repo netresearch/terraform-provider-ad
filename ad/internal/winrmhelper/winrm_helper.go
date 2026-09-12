@@ -100,13 +100,8 @@ func SanitiseString(key string) string {
 func SetMachineExtensionNames(conf *config.ProviderConf, gpoDN, value string) error {
 	cmd := fmt.Sprintf(`Set-ADObject -Identity "%s" -Replace @{gPCMachineExtensionNames="%s"}`, gpoDN, value)
 	psOpts := NewPSCommandOpts(conf)
-	psCmd := NewPSCommand([]string{cmd}, psOpts)
-	result, err := psCmd.Run(conf)
-	if err != nil {
-		return fmt.Errorf("error while setting machine extension names for GPO %q: %s", gpoDN, err)
-	}
-	if result.ExitCode != 0 {
-		return fmt.Errorf("command to set machine extension names for GPO %q failed, stderr: %s, stdout: %s", gpoDN, result.StdErr, result.Stdout)
+	if _, err := RunPSCommand(conf, psOpts, fmt.Sprintf("setting machine extension names for GPO %q", gpoDN), cmd); err != nil {
+		return err
 	}
 	return nil
 }

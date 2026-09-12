@@ -65,6 +65,49 @@ func NewDomainPSCommandOpts(conf *config.ProviderConf) CreatePSCommandOpts {
 	return opts
 }
 
+// RunPSCommand builds and runs one or more PowerShell commands and turns both
+// failure modes into an error naming what was attempted.
+//
+// `what` completes the sentence "while …", so it reads as a present participle
+// plus the context the caller has: "creating group %q", "removing the OU".
+//
+// Run reports an error only for transport failures. A command the directory
+// refuses comes back with no error and a non-zero exit code, which is the check
+// callers used to write out by hand and occasionally forgot.
+//
+// Callers that treat a particular failure as success — a group that already
+// exists, a GPO link that is already gone — match on the returned error, whose
+// text carries the command's stderr in both cases. The result is nil whenever
+// the error is non-nil.
+func RunPSCommand(conf *config.ProviderConf, opts CreatePSCommandOpts, what string, cmds ...string) (*PSCommandResult, error) {
+	result, err := NewPSCommand(cmds, opts).Run(conf)
+	if cmdErr := checkPSResult(result, err, what, opts.Password); cmdErr != nil {
+		return nil, cmdErr
+	}
+	return result, nil
+}
+
+// checkPSResult is the error half of RunPSCommand, split off so it can be
+// tested without a WinRM connection.
+//
+// stderr and stdout of a failed command go into the error, and Terraform prints
+// that error to the console and into CI logs. Both can quote the command that
+// produced them, which for New-ADUser and Set-ADAccountPassword is a command
+// carrying a password, so both go through the same redaction Run applies to its
+// debug log.
+func checkPSResult(result *PSCommandResult, err error, what, password string) error {
+	if err != nil {
+		return fmt.Errorf("while %s: %s", what, err)
+	}
+	if result.ExitCode != 0 {
+		return fmt.Errorf("while %s: exit code %d, stderr: %s, stdout: %s",
+			what, result.ExitCode,
+			redactSensitiveData(result.StdErr, password),
+			redactSensitiveData(result.Stdout, password))
+	}
+	return nil
+}
+
 type PSCommand struct {
 	CreatePSCommandOpts
 	cmd string
@@ -179,7 +222,8 @@ func (p *PSCommand) Run(conf *config.ProviderConf) (*PSCommandResult, error) {
 
 	if err != nil {
 		log.Printf("[DEBUG] run error : %s", err)
-		return nil, fmt.Errorf("powershell command failed with exit code %d\nstdout: %s\nstderr: %s\nerror: %s", res, stdout, stderr, err)
+		return nil, fmt.Errorf("powershell command failed with exit code %d\nstdout: %s\nstderr: %s\nerror: %s",
+			res, redactSensitiveData(stdout, p.Password), redactSensitiveData(stderr, p.Password), err)
 	}
 
 	log.Printf("[DEBUG] Powershell command exited with code %d", res)

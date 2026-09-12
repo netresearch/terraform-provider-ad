@@ -99,14 +99,8 @@ func (g *GPLink) ModifyGPLink(conf *config.ProviderConf, changes map[string]any)
 		return nil
 	}
 	psOpts := NewDomainPSCommandOpts(conf)
-	psCmd := NewPSCommand(cmds, psOpts)
-	result, err := psCmd.Run(conf)
-	if err != nil {
-		return fmt.Errorf("error while running Set-GPLink: %s", err)
-	}
-
-	if result.ExitCode != 0 {
-		return fmt.Errorf("Set-GPLink exited with a non-zero exit code %d, stderr :%s", result.ExitCode, result.StdErr)
+	if _, err := RunPSCommand(conf, psOpts, "running Set-GPLink", cmds...); err != nil {
+		return err
 	}
 
 	return nil

@@ -390,13 +390,8 @@ func (u *User) ModifyUser(d *schema.ResourceData, conf *config.ProviderConf) err
 		cmd := fmt.Sprintf("Move-AdObject -Identity %q -TargetPath %q", u.GUID, path)
 		psOpts := NewPSCommandOpts(conf)
 		psOpts.JSONOutput = true
-		psCmd := NewPSCommand([]string{cmd}, psOpts)
-		result, err := psCmd.Run(conf)
-		if err != nil {
-			return fmt.Errorf("winrm execution failure while moving user object: %s", err)
-		}
-		if result.ExitCode != 0 {
-			return fmt.Errorf("Move-ADObject exited with a non zero exit code (%d), stderr: %s", result.ExitCode, result.StdErr)
+		if _, err := RunPSCommand(conf, psOpts, "moving the user object", cmd); err != nil {
+			return err
 		}
 	}
 

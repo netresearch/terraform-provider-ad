@@ -80,13 +80,9 @@ func GetGPOFromHost(conf *config.ProviderConf, name, guid string) (*GPO, error) 
 	}
 	psOpts := NewDomainPSCommandOpts(conf)
 	psOpts.JSONOutput = true
-	psCmd := NewPSCommand([]string{cmd}, psOpts)
-	result, err := psCmd.Run(conf)
+	result, err := RunPSCommand(conf, psOpts, "retrieving the GPO", cmd)
 	if err != nil {
 		return nil, err
-	}
-	if result.ExitCode != 0 {
-		return nil, fmt.Errorf("command exited with a non-zero exit code %d, stderr: %s", result.ExitCode, result.StdErr)
 	}
 	gpo, err := unmarshallGPO([]byte(result.Stdout))
 	if err != nil {
@@ -238,13 +234,9 @@ func (g *GPO) UpdateGPO(config *config.ProviderConf, d *schema.ResourceData) (st
 func (g *GPO) getGPOFilePath(conf *config.ProviderConf) (string, error) {
 	cmd := fmt.Sprintf("(Get-ADObject  -LDAPFilter '(&(objectClass=groupPolicyContainer)(cn={%s}))' -Properties gPCFilesysPath).gPCFilesysPath", g.ID)
 	psOpts := NewDomainPSCommandOpts(conf)
-	psCmd := NewPSCommand([]string{cmd}, psOpts)
-	result, err := psCmd.Run(conf)
+	result, err := RunPSCommand(conf, psOpts, fmt.Sprintf("retrieving the path of GPO %q", g.ID), cmd)
 	if err != nil {
-		return "", fmt.Errorf("error while retrieving GPO with %q path: %s", g.ID, err)
-	}
-	if result.ExitCode != 0 {
-		return "", fmt.Errorf("error while retrieving SYSVOL path, stderr: %s, stdout: %s", result.StdErr, result.Stdout)
+		return "", err
 	}
 	return result.Stdout, nil
 }
@@ -254,13 +246,9 @@ func (g *GPO) getGPOFilePath(conf *config.ProviderConf) (string, error) {
 func getSysVolPath(conf *config.ProviderConf) (string, error) {
 	cmd := "(Get-SmbShare sysvol).path"
 	psOpts := NewDomainPSCommandOpts(conf)
-	psCmd := NewPSCommand([]string{cmd}, psOpts)
-	result, err := psCmd.Run(conf)
+	result, err := RunPSCommand(conf, psOpts, "retrieving the SYSVOL path", cmd)
 	if err != nil {
-		return "", fmt.Errorf("error while retrieving SYSVOL path")
-	}
-	if result.ExitCode != 0 {
-		return "", fmt.Errorf("error while retrieving SYSVOL path, stderr: %s, stdout: %s", result.StdErr, result.Stdout)
+		return "", err
 	}
 	return result.Stdout, nil
 }
@@ -298,13 +286,8 @@ func (g *GPO) SetADGPOVersions(conf *config.ProviderConf, gpoVersion uint32) err
 	psOpts = NewPSCommandOpts(conf)
 	psOpts.Server = ""
 	psOpts.SkipCredSuffix = true
-	psCmd := NewPSCommand([]string{cmd}, psOpts)
-	result, err := psCmd.Run(conf)
-	if err != nil {
-		return fmt.Errorf("error while setting new version in AD for GPO %q: %s", g.ID, err)
-	}
-	if result.ExitCode != 0 {
-		return fmt.Errorf("command to set the version of GPO %q in AD failed, stderr: %s, stdout: %s", g.ID, result.StdErr, result.Stdout)
+	if _, err := RunPSCommand(conf, psOpts, fmt.Sprintf("setting the new version in AD for GPO %q", g.ID), cmd); err != nil {
+		return err
 	}
 	return nil
 }
@@ -356,13 +339,9 @@ func (g *GPO) loadGPTIni(conf *config.ProviderConf) error {
 	log.Printf("[DEBUG] Getting GPT ini from %s", gptPath)
 	cmd := fmt.Sprintf(`Get-Content "%s"`, gptPath)
 	psOpts := NewDomainPSCommandOpts(conf)
-	psCmd := NewPSCommand([]string{cmd}, psOpts)
-	result, err := psCmd.Run(conf)
+	result, err := RunPSCommand(conf, psOpts, fmt.Sprintf("retrieving contents of %q", gptPath), cmd)
 	if err != nil {
-		return fmt.Errorf("error while retrieving contents of %q: %s", gptPath, err)
-	}
-	if result.ExitCode != 0 {
-		return fmt.Errorf("command to retrieve contents of %q failed, stderr: %s, stdout: %s", gptPath, result.StdErr, result.Stdout)
+		return err
 	}
 
 	iniFile, err := ini.Load([]byte(result.Stdout))

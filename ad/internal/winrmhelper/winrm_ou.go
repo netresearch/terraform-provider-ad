@@ -48,13 +48,9 @@ func NewOrgUnitFromHost(conf *config.ProviderConf, guid, name, path string) (*Or
 	}
 	psOpts := NewPSCommandOpts(conf)
 	psOpts.JSONOutput = true
-	psCmd := NewPSCommand([]string{cmd}, psOpts)
-	result, err := psCmd.Run(conf)
+	result, err := RunPSCommand(conf, psOpts, "retrieving the OU", cmd)
 	if err != nil {
 		return nil, err
-	}
-	if result.ExitCode != 0 {
-		return nil, fmt.Errorf("Get-ADOrganizationalUnit exited with a non-zero exit code %d, stderr :%s", result.ExitCode, result.StdErr)
 	}
 	ou, err := unmarshallOU([]byte(result.Stdout))
 	if err != nil {
@@ -85,13 +81,9 @@ func (o *OrgUnit) Create(conf *config.ProviderConf) (string, error) {
 	cmd = fmt.Sprintf("%s -ProtectedFromAccidentalDeletion:$%t", cmd, o.Protected)
 	psOpts := NewPSCommandOpts(conf)
 	psOpts.JSONOutput = true
-	psCmd := NewPSCommand([]string{cmd}, psOpts)
-	result, err := psCmd.Run(conf)
+	result, err := RunPSCommand(conf, psOpts, "creating the OU", cmd)
 	if err != nil {
 		return "", err
-	}
-	if result.ExitCode != 0 {
-		return "", fmt.Errorf("Get-ADOrganizationalUnit exited with a non-zero exit code %d, stderr :%s", result.ExitCode, result.StdErr)
 	}
 	ou, err := unmarshallOU([]byte(result.Stdout))
 	if err != nil {
@@ -122,13 +114,8 @@ func (o *OrgUnit) Update(conf *config.ProviderConf, changes map[string]any) erro
 	if cmd != "Set-ADOrganizationalUnit -Identity" {
 		psOpts := NewPSCommandOpts(conf)
 		psOpts.JSONOutput = true
-		psCmd := NewPSCommand([]string{cmd}, psOpts)
-		result, err := psCmd.Run(conf)
-		if err != nil {
+		if _, err := RunPSCommand(conf, psOpts, "modifying the OU", cmd); err != nil {
 			return err
-		}
-		if result.ExitCode != 0 {
-			return fmt.Errorf("Set-ADOrganizationalUnit exited with a non-zero exit code %d, stderr :%s", result.ExitCode, result.StdErr)
 		}
 	}
 
@@ -138,13 +125,8 @@ func (o *OrgUnit) Update(conf *config.ProviderConf, changes map[string]any) erro
 			cmd := fmt.Sprintf("Set-ADOrganizationalUnit -Identity %q -ProtectedFromAccidentalDeletion:$false", o.GUID)
 			psOpts := NewPSCommandOpts(conf)
 			psOpts.JSONOutput = true
-			psCmd := NewPSCommand([]string{cmd}, psOpts)
-			result, err := psCmd.Run(conf)
-			if err != nil {
-				return fmt.Errorf("winrm execution failure while unprotecting OU object: %s", err)
-			}
-			if result.ExitCode != 0 {
-				return fmt.Errorf("Set-ADOrganizationalUnit exited with a non zero exit code (%d), stderr: %s", result.ExitCode, result.StdErr)
+			if _, err := RunPSCommand(conf, psOpts, "unprotecting the OU object", cmd); err != nil {
+				return err
 			}
 			unprotected = true
 		}
@@ -152,26 +134,16 @@ func (o *OrgUnit) Update(conf *config.ProviderConf, changes map[string]any) erro
 		cmd := fmt.Sprintf("Move-ADObject -Identity %q -TargetPath %q", o.GUID, path.(string))
 		psOpts := NewPSCommandOpts(conf)
 		psOpts.JSONOutput = true
-		psCmd := NewPSCommand([]string{cmd}, psOpts)
-		result, err := psCmd.Run(conf)
-		if err != nil {
-			return fmt.Errorf("winrm execution failure while moving OU object: %s", err)
-		}
-		if result.ExitCode != 0 {
-			return fmt.Errorf("Move-ADObject exited with a non zero exit code (%d), stderr: %s", result.ExitCode, result.StdErr)
+		if _, err := RunPSCommand(conf, psOpts, "moving the OU object", cmd); err != nil {
+			return err
 		}
 
 		if unprotected == true {
 			cmd := fmt.Sprintf("Set-ADOrganizationalUnit -Identity %q -ProtectedFromAccidentalDeletion:$true", o.GUID)
 			psOpts := NewPSCommandOpts(conf)
 			psOpts.JSONOutput = true
-			psCmd := NewPSCommand([]string{cmd}, psOpts)
-			result, err := psCmd.Run(conf)
-			if err != nil {
-				return fmt.Errorf("winrm execution failure while protecting OU object: %s", err)
-			}
-			if result.ExitCode != 0 {
-				return fmt.Errorf("Set-ADOrganizationalUnit exited with a non zero exit code (%d), stderr: %s", result.ExitCode, result.StdErr)
+			if _, err := RunPSCommand(conf, psOpts, "protecting the OU object", cmd); err != nil {
+				return err
 			}
 		}
 	}
@@ -180,13 +152,8 @@ func (o *OrgUnit) Update(conf *config.ProviderConf, changes map[string]any) erro
 		cmd = fmt.Sprintf("Set-ADObject -Identity %s -ProtectedFromAccidentalDeletion:$%t", o.GUID, protected.(bool))
 		psOpts := NewPSCommandOpts(conf)
 		psOpts.JSONOutput = true
-		psCmd := NewPSCommand([]string{cmd}, psOpts)
-		result, err := psCmd.Run(conf)
-		if err != nil {
+		if _, err := RunPSCommand(conf, psOpts, "updating the OU's protected status", cmd); err != nil {
 			return err
-		}
-		if result.ExitCode != 0 {
-			return fmt.Errorf("Set-ADObject exited with a non-zero exit code (%d) while updating OU's protected status, stderr :%s", result.ExitCode, result.StdErr)
 		}
 	}
 
@@ -194,13 +161,8 @@ func (o *OrgUnit) Update(conf *config.ProviderConf, changes map[string]any) erro
 		cmd = fmt.Sprintf("Rename-ADObject -Identity %q %q ", o.GUID, name.(string))
 		psOpts := NewPSCommandOpts(conf)
 		psOpts.JSONOutput = true
-		psCmd := NewPSCommand([]string{cmd}, psOpts)
-		result, err := psCmd.Run(conf)
-		if err != nil {
+		if _, err := RunPSCommand(conf, psOpts, "renaming the OU", cmd); err != nil {
 			return err
-		}
-		if result.ExitCode != 0 {
-			return fmt.Errorf("Set-ADObject exited with a non-zero exit code (%d) while renaming OU, stderr :%s", result.ExitCode, result.StdErr)
 		}
 	}
 	return nil
@@ -230,13 +192,8 @@ func (o *OrgUnit) Delete(conf *config.ProviderConf) error {
 	psOpts.JSONOutput = true
 	psOpts.Server = ""
 	psOpts.SkipCredSuffix = true
-	psCmd := NewPSCommand([]string{cmd}, psOpts)
-	result, err := psCmd.Run(conf)
-	if err != nil {
+	if _, err := RunPSCommand(conf, psOpts, "removing the OU", cmd); err != nil {
 		return err
-	}
-	if result.ExitCode != 0 {
-		return fmt.Errorf("Get-ADObject -Properties * exited with a non-zero exit code %d, stderr :%s", result.ExitCode, result.StdErr)
 	}
 	return nil
 }

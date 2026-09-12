@@ -48,13 +48,9 @@ func GetSecIniContents(conf *config.ProviderConf, gpo *GPO) ([]byte, error) {
 
 	cmd := fmt.Sprintf(`Get-Content "%s"`, gptPath)
 	psOpts := NewDomainPSCommandOpts(conf)
-	psCmd := NewPSCommand([]string{cmd}, psOpts)
-	result, err := psCmd.Run(conf)
+	result, err := RunPSCommand(conf, psOpts, fmt.Sprintf("retrieving contents of %q", gptPath), cmd)
 	if err != nil {
-		return nil, fmt.Errorf("error while retrieving contents of %q: %s", gptPath, err)
-	}
-	if result.ExitCode != 0 {
-		return nil, fmt.Errorf("command to retrieve contents of %q failed, stderr: %s, stdout: %s", gptPath, result.StdErr, result.Stdout)
+		return nil, err
 	}
 
 	iniBytes := []byte(result.Stdout)
