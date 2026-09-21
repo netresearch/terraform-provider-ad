@@ -1,0 +1,17 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "github>netresearch/renovate-config"
+  ],
+  "forkProcessing": "enabled",
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": ".go-version pins the Go toolchain that release.yml and unit_tests.yaml install through setup-go's go-version-file. Renovate has no built-in manager for that file, so this regex manager tracks it against the golang-version datasource. The go directive in go.mod is the floor and stays where it is (Renovate does not bump it by default).",
+      "managerFilePatterns": ["/^\\.go-version$/"],
+      "matchStrings": ["^(?<currentValue>\\d+\\.\\d+\\.\\d+)\\s*$"],
+      "depNameTemplate": "go",
+      "datasourceTemplate": "golang-version"
+    }
+  ]
+}
