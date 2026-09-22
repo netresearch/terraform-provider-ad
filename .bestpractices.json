@@ -1,7 +1,7 @@
 {
   "_comment": "Proposed answers for the OpenSSF Best Practices badge, derived from evidence in this repository. Only criteria backed by a file or setting are listed; everything else is left for the maintainers to answer. Format: https://github.com/ossf/best-practices-badge/blob/main/docs/bestpractices-json.md",
   "dependency_monitoring_status": "Met",
-  "dependency_monitoring_justification": "Dependencies are checked automatically for updates and known vulnerabilities, configured in https://github.com/netresearch/terraform-provider-ad/blob/main/renovate.json",
+  "dependency_monitoring_justification": "Renovate monitors the dependencies (https://github.com/netresearch/terraform-provider-ad/blob/main/renovate.json) and extends the shared configuration, whose vulnerabilityAlerts open a fix pull request for a known vulnerability: https://github.com/netresearch/renovate-config/blob/main/default.json",
   "discussion_status": "Met",
   "discussion_justification": "GitHub issues and pull requests are public, searchable, addressable by URL and need no proprietary client: https://github.com/netresearch/terraform-provider-ad/issues",
   "floss_license_status": "Met",
@@ -17,7 +17,7 @@
   "repo_track_status": "Met",
   "repo_track_justification": "Git records the author, date and change of every commit; the history is browsable at https://github.com/netresearch/terraform-provider-ad/commits/main",
   "report_archive_status": "Met",
-  "report_archive_justification": "All reports and responses stay publicly searchable in the issue tracker: https://github.com/netresearch/terraform-provider-ad/issues?q=is%3Aissue",
+  "report_archive_justification": "Public bug reports and the responses to them stay searchable in the issue tracker: https://github.com/netresearch/terraform-provider-ad/issues?q=is%3Aissue",
   "report_process_status": "Met",
   "report_process_justification": "Bugs are reported through the GitHub issue tracker: https://github.com/netresearch/terraform-provider-ad/issues",
   "sites_https_status": "Met",
