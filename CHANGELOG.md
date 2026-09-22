@@ -1,3 +1,8 @@
+## v0.5.4 (netresearch fork, September 22, 2026)
+
+NOTES:
+* **Provider**: the release binaries are built with Go 1.27.1 instead of 1.27.0. Go 1.27.1 is a patch release with bug fixes to cgo, the compiler, the runtime and several standard-library packages, among them `encoding/json`, `net/http` and `os`; the Go project lists no security fix in it. The `go` directive stays at 1.27.0, so the Go version needed to build from source is unchanged. ([#43](https://github.com/netresearch/terraform-provider-ad/pull/43))
+
 ## v0.5.3 (netresearch fork, September 12, 2026)
 
 NOTES:
