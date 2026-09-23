@@ -1,7 +1,5 @@
 {
   "_comment": "Proposed answers for the OpenSSF Best Practices badge, derived from evidence in this repository. Only criteria backed by a file or setting are listed; everything else is left for the maintainers to answer. Format: https://github.com/ossf/best-practices-badge/blob/main/docs/bestpractices-json.md",
-  "dependency_monitoring_status": "Met",
-  "dependency_monitoring_justification": "Renovate monitors the dependencies (https://github.com/netresearch/terraform-provider-ad/blob/main/renovate.json) and extends the shared configuration, whose vulnerabilityAlerts open a fix pull request for a known vulnerability: https://github.com/netresearch/renovate-config/blob/main/default.json",
   "discussion_status": "Met",
   "discussion_justification": "GitHub issues and pull requests are public, searchable, addressable by URL and need no proprietary client: https://github.com/netresearch/terraform-provider-ad/issues",
   "floss_license_status": "Met",
@@ -21,7 +19,7 @@
   "report_process_status": "Met",
   "report_process_justification": "Bugs are reported through the GitHub issue tracker: https://github.com/netresearch/terraform-provider-ad/issues",
   "sites_https_status": "Met",
-  "sites_https_justification": "The repository and its download URLs are served over HTTPS by GitHub: https://github.com/netresearch/terraform-provider-ad and the project website https://registry.terraform.io/providers/netresearch/ad/latest",
+  "sites_https_justification": "Every project site is served over HTTPS: the repository and its release downloads, https://github.com/netresearch/terraform-provider-ad; the project website, https://registry.terraform.io/providers/netresearch/ad/latest.",
   "version_semver_status": "Met",
   "version_semver_justification": "Releases follow Semantic Versioning, for example v0.5.4: https://github.com/netresearch/terraform-provider-ad/tags",
   "version_tags_status": "Met",
