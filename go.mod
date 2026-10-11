@@ -7,14 +7,14 @@ require (
 	github.com/hashicorp/go-cty v1.5.0
 	github.com/hashicorp/terraform-plugin-sdk/v2 v2.40.1
 	github.com/jcmturner/gokrb5/v8 v8.4.4
-	github.com/masterzen/winrm v0.0.0-20260407182533-5570be7f80cf
+	github.com/masterzen/winrm v0.0.0-20261004123143-57b335310d59
 	github.com/packer-community/winrmcp v0.0.0-20221126162354-6e900dd2c68f
 	golang.org/x/text v0.42.0
 	gopkg.in/ini.v1 v1.67.3
 )
 
 require (
-	github.com/Azure/go-ntlmssp v0.1.1 // indirect
+	github.com/Azure/go-ntlmssp v0.1.2-0.20260824092057-1c8077778c2c // indirect
 	github.com/ChrisTrenkamp/goxpath v0.0.0-20210404020558-97928f7e12b6 // indirect
 	github.com/ProtonMail/go-crypto v1.4.1 // indirect
 	github.com/agext/levenshtein v1.2.3 // indirect
