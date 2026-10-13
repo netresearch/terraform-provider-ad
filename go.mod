@@ -9,7 +9,7 @@ require (
 	github.com/jcmturner/gokrb5/v8 v8.4.4
 	github.com/masterzen/winrm v0.0.0-20261004123143-57b335310d59
 	github.com/packer-community/winrmcp v0.0.0-20221126162354-6e900dd2c68f
-	golang.org/x/text v0.42.0
+	golang.org/x/text v0.43.0
 	gopkg.in/ini.v1 v1.67.3
 )
 
@@ -71,9 +71,9 @@ require (
 	golang.org/x/crypto v0.57.0 // indirect
 	golang.org/x/mod v0.41.0 // indirect
 	golang.org/x/net v0.59.0 // indirect
-	golang.org/x/sync v0.23.0 // indirect
+	golang.org/x/sync v0.24.0 // indirect
 	golang.org/x/sys v0.48.0 // indirect
-	golang.org/x/tools v0.50.0 // indirect
+	golang.org/x/tools v0.51.0 // indirect
 	google.golang.org/appengine v1.6.8 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260911204522-f61a6ca850bd // indirect
 	google.golang.org/grpc v1.83.2 // indirect
