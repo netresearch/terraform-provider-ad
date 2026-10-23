@@ -1,3 +1,11 @@
+## v0.5.5 (netresearch fork, October 23, 2026)
+
+SECURITY:
+* **Provider**: the release binaries are built with Go 1.27.3 instead of 1.27.1. Go 1.27.3 makes `crypto/x509` reject certificate chains that contain the compromised eMudhra intermediate certificates (CVE-2026-111943, [golang/go#82345](https://github.com/golang/go/issues/82345)), which covers the provider's HTTPS connections to WinRM. `govulncheck` reported 10 reachable standard-library vulnerabilities against Go 1.27.1 and none against 1.27.3. The `go` directive stays at 1.27.0. ([#58](https://github.com/netresearch/terraform-provider-ad/pull/58))
+
+NOTES:
+* **Provider**: Go module dependencies are updated, among them `golang.org/x/crypto` v0.58.0, `golang.org/x/net` v0.61.0, `golang.org/x/text` v0.43.0, `google.golang.org/grpc` v1.84.0 and `github.com/masterzen/winrm` at commit 57b3353. `go mod tidy` drops three modules nothing imports. ([#48](https://github.com/netresearch/terraform-provider-ad/pull/48), [#55](https://github.com/netresearch/terraform-provider-ad/pull/55), [#60](https://github.com/netresearch/terraform-provider-ad/pull/60))
+
 ## v0.5.4 (netresearch fork, September 22, 2026)
 
 NOTES:
