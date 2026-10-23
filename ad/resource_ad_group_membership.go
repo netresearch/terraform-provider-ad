@@ -41,9 +41,9 @@ func resourceADGroupMembership() *schema.Resource {
 }
 
 func resourceADGroupMembershipRead(d *schema.ResourceData, meta any) error {
-	toks := strings.Split(d.Id(), "_")
+	groupID := membershipGroupID(d.Id())
 
-	gm, err := winrmhelper.NewGroupMembershipFromHost(meta.(*config.ProviderConf), toks[0])
+	gm, err := winrmhelper.NewGroupMembershipFromHost(meta.(*config.ProviderConf), groupID)
 	if err != nil {
 		return err
 	}
@@ -59,22 +59,35 @@ func resourceADGroupMembershipRead(d *schema.ResourceData, meta any) error {
 
 	memberList := winrmhelper.ReconcileMemberIdentifiers(gm.GroupMembers, configured)
 	_ = d.Set("group_members", memberList)
-	_ = d.Set("group_id", toks[0])
+	_ = d.Set("group_id", groupID)
 	return nil
 }
 
-// membershipID builds the resource id for a group membership: the group's GUID,
-// an underscore, and a fresh GUID that only has to be unique.
+// membershipID builds the resource id for a group membership: the configured
+// group_id, an underscore, and a fresh GUID that only has to be unique.
 //
-// Read splits on the first underscore and uses the token before it, so the group
-// half must not contain one; what follows is opaque to Read. String is called
+// The group_id can be a SAM account name or a distinguished name, and either may
+// contain an underscore, so membershipGroupID recovers it by removing the GUID
+// suffix rather than by splitting at the first underscore. String is called
 // explicitly rather than left to the %s verb — the verb reaches it either way,
 // since the method has a value receiver — so that the conversion is visible at
 // the one place that decides what a resource id looks like. The id lands in
 // serialised state and is what `terraform import` has to be handed back, so
 // anything that stops it being canonical text belongs in a diff, not in a verb.
-func membershipID(groupGUID string) string {
-	return fmt.Sprintf("%s_%s", groupGUID, uuid.New().String())
+func membershipID(groupID string) string {
+	return fmt.Sprintf("%s_%s", groupID, uuid.New().String())
+}
+
+// membershipGroupID returns the group_id part of a resource id built by
+// membershipID. It removes the text from the last underscore on only when that
+// text is a canonical GUID; any other id is taken whole as the group_id, which
+// keeps an import by a bare group name containing an underscore intact.
+func membershipGroupID(id string) string {
+	i := strings.LastIndex(id, "_")
+	if i < 0 || parseGUID(id[i+1:]) != nil {
+		return id
+	}
+	return id[:i]
 }
 
 func resourceADGroupMembershipCreate(d *schema.ResourceData, meta any) error {
