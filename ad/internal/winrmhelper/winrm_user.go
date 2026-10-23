@@ -370,7 +370,7 @@ func (u *User) ModifyUser(d *schema.ResourceData, conf *config.ProviderConf) err
 	// username is the object's name (CN). Set-ADUser has no parameter for it, so
 	// a change goes through Rename-ADObject, as it does for ad_group.
 	if d.HasChange("username") {
-		cmd := fmt.Sprintf("Rename-ADObject -Identity %q -NewName %q", u.GUID, SanitiseTFInput(d, "username"))
+		cmd := renameUserCommand(u.GUID, SanitiseTFInput(d, "username"))
 		if _, err := RunPSCommand(conf, "renaming the user", cmd); err != nil {
 			return err
 		}
@@ -385,6 +385,14 @@ func (u *User) ModifyUser(d *schema.ResourceData, conf *config.ProviderConf) err
 	}
 
 	return nil
+}
+
+// renameUserCommand builds the Rename-ADObject call for a new name that
+// SanitiseString has already escaped. The name goes into plain double quotes,
+// as the Set-ADUser parameters do: %q would escape it a second time with Go
+// rules, which PowerShell does not read.
+func renameUserCommand(guid, sanitisedName string) string {
+	return fmt.Sprintf(`Rename-ADObject -Identity %q -NewName "%s"`, guid, sanitisedName)
 }
 
 // DeleteUser deletes an AD user by calling Remove-ADUser
