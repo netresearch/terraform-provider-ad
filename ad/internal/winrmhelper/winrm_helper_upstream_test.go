@@ -43,7 +43,9 @@ func TestPSHashtableEntryQuotesKey(t *testing.T) {
 	}{
 		{"hyphenated key", "ms-DS-ConsistencyGuid", `"abc"`, `'ms-DS-ConsistencyGuid'="abc"`},
 		{"plain key", "extensionAttribute1", `"x"`, `'extensionAttribute1'="x"`},
-		{"key is sanitised", "a$b", `"x"`, "'a`$b'=\"x\""},
+		// Inside single quotes a $ is literal and a backtick would be kept, so
+		// the key is not run through SanitiseString: 'a`$b' is the key a`$b.
+		{"dollar stays literal", "a$b", `"x"`, `'a$b'="x"`},
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			got := PSHashtableEntry(c.key, c.value)
@@ -65,7 +67,9 @@ func TestPSHashtableEntryEscapesApostrophes(t *testing.T) {
 		name, key, want string
 	}{
 		{"apostrophe in key", "O'Brien", `'O''Brien'="x"`},
-		{"literal-breaking attempt", `a'+$(whoami)+'b`, "'a''+`$(whoami)+''b'=\"x\""},
+		{"literal-breaking attempt", `a'+$(whoami)+'b`, `'a''+$(whoami)+''b'="x"`},
+		// PowerShell reads the typographic single quotes as quote marks too.
+		{"typographic apostrophe in key", "O\u2019Brien", "'O\u2019\u2019Brien'=\"x\""},
 		{"no apostrophe is untouched", "plainKey", `'plainKey'="x"`},
 	} {
 		t.Run(c.name, func(t *testing.T) {

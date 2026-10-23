@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"testing"
 )
@@ -14,11 +13,12 @@ import (
 // password reached the Terraform console on every failed New-ADUser.
 //
 // The rendering below is the real one — SanitiseString turns `"` into “ `" “
-// and %q then escapes that quote again — so the fixture fails the same way the
-// provider did rather than a way invented for the test.
+// and psQuoteSanitised puts the result into double quotes — so the fixture
+// fails the same way the provider's command does rather than a way invented
+// for the test.
 func TestSecretRedactsAPasswordThePatternsCannotMatch(t *testing.T) {
 	const raw = `pa"ssWord1!`
-	rendered := strconv.Quote(SanitiseString(raw))
+	rendered := psQuoteSanitised(SanitiseString(raw))
 	command := fmt.Sprintf(
 		`New-ADUser -Passthru -Name "u" -AccountPassword (ConvertTo-SecureString -AsPlainText %s -Force)`,
 		rendered)
@@ -44,7 +44,7 @@ func TestSecretRedactsAPasswordThePatternsCannotMatch(t *testing.T) {
 // mangled by the two mechanisms overlapping.
 func TestSecretAndThePatternsAgreeOnAnOrdinaryPassword(t *testing.T) {
 	const raw = "Sup3rS3cret!"
-	rendered := strconv.Quote(SanitiseString(raw))
+	rendered := psQuoteSanitised(SanitiseString(raw))
 	command := fmt.Sprintf(
 		`New-ADUser -AccountPassword (ConvertTo-SecureString -AsPlainText %s -Force)`, rendered)
 
@@ -58,7 +58,7 @@ func TestSecretAndThePatternsAgreeOnAnOrdinaryPassword(t *testing.T) {
 // the console and CI logs see.
 func TestSecretReachesTheRenderedError(t *testing.T) {
 	const raw = `pa"ssWord1!`
-	rendered := strconv.Quote(SanitiseString(raw))
+	rendered := psQuoteSanitised(SanitiseString(raw))
 
 	err := checkPSResult(&PSCommandResult{
 		ExitCode: 1,
@@ -77,7 +77,7 @@ func TestSecretIsCarriedByTheOptions(t *testing.T) {
 	conf := credentialConf(t)
 	opts := NewPSCommandOpts(conf, SecretPassword(`rendered-secret`))
 
-	if len(opts.Secrets) != 1 || opts.Secrets[0] != strconv.Quote("rendered-secret") {
+	if len(opts.Secrets) != 1 || opts.Secrets[0] != psQuoteSanitised("rendered-secret") {
 		t.Fatalf("Secret did not reach the options: %#v", opts.Secrets)
 	}
 
@@ -102,14 +102,14 @@ func TestSecretIgnoresAnEmptyValue(t *testing.T) {
 	}
 }
 
-// strconv.Quote("") is the two-character string `""`, not empty. Registering it
+// psQuoteSanitised("") is the two-character string `""`, not empty. Registering it
 // would redact every empty string literal the provider renders — an attribute set
 // to "", a JSON field, the lot. SecretPassword takes the password rather than the
 // rendering so that this exception lives in one place instead of at each call
 // site, where it was wrong at both.
 func TestAnAbsentPasswordRegistersNothing(t *testing.T) {
-	if strconv.Quote("") == "" {
-		t.Fatal(`strconv.Quote("") is empty here, so this test cannot exercise the case it exists for`)
+	if psQuoteSanitised("") == "" {
+		t.Fatal(`psQuoteSanitised("") is empty here, so this test cannot exercise the case it exists for`)
 	}
 
 	opts := CreatePSCommandOpts{}
@@ -128,7 +128,7 @@ func TestSecretPasswordRegistersTheRendering(t *testing.T) {
 	opts := CreatePSCommandOpts{}
 	SecretPassword(`pa"ssWord1!`)(nil, &opts)
 
-	if len(opts.Secrets) != 1 || opts.Secrets[0] != strconv.Quote(`pa"ssWord1!`) {
+	if len(opts.Secrets) != 1 || opts.Secrets[0] != psQuoteSanitised(`pa"ssWord1!`) {
 		t.Fatalf("expected the quoted rendering, got %q", opts.Secrets)
 	}
 }

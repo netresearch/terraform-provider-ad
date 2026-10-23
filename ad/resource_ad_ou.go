@@ -59,7 +59,7 @@ func resourceADOURead(d *schema.ResourceData, meta any) error {
 		return nil
 	}
 
-	ou, err := winrmhelper.NewOrgUnitFromHost(meta.(*config.ProviderConf), d.Id(), "", "")
+	ou, err := winrmhelper.NewOrgUnitFromHost(meta.(*config.ProviderConf), winrmhelper.SanitiseString(d.Id()), "", "")
 	if err != nil {
 		if winrmhelper.ErrorMentions(err, "ObjectNotFound") {
 			// Resource no longer exists

@@ -34,10 +34,16 @@ func NewComputerFromResource(d *schema.ResourceData) *Computer {
 	}
 }
 
+// computerLookupCommand renders the Get-ADComputer call for an identity that
+// has already been through SanitiseString.
+func computerLookupCommand(identity string) string {
+	return fmt.Sprintf("Get-ADComputer -Identity %s -Properties *", psQuoteSanitised(identity))
+}
+
 // NewComputerFromHost return a new Machine struct populated from data we get
-// from the domain controller
+// from the domain controller. identity has already been through SanitiseString.
 func NewComputerFromHost(conf *config.ProviderConf, identity string) (*Computer, error) {
-	cmd := fmt.Sprintf("Get-ADComputer -Identity %q -Properties *", identity)
+	cmd := computerLookupCommand(identity)
 	conn, err := conf.AcquireWinRMClient()
 	if err != nil {
 		return nil, fmt.Errorf("while acquiring winrm client: %s", err)
@@ -56,26 +62,31 @@ func NewComputerFromHost(conf *config.ProviderConf, identity string) (*Computer,
 	return computer, nil
 }
 
+// newComputerCommand renders the New-ADComputer call for m, whose fields hold
+// values that SanitiseString has already escaped.
+func newComputerCommand(m *Computer) string {
+	cmd := fmt.Sprintf("New-ADComputer -Passthru -Name %s", psQuoteSanitised(m.Name))
+
+	if m.SAMAccountName != "" {
+		cmd = fmt.Sprintf("%s -SamAccountName %s", cmd, psQuoteSanitised(m.SAMAccountName))
+	}
+
+	if m.Path != "" {
+		cmd = fmt.Sprintf("%s -Path %s", cmd, psQuoteSanitised(m.Path))
+	}
+
+	if m.Description != "" {
+		cmd = fmt.Sprintf("%s -Description %s", cmd, psQuoteSanitised(m.Description))
+	}
+	return cmd
+}
+
 // Create creates a new Computer object in the AD tree
 func (m *Computer) Create(conf *config.ProviderConf) (string, error) {
 	if m.Name == "" {
 		return "", fmt.Errorf("Computer.Create: missing name variable")
 	}
-	cmd := fmt.Sprintf("New-ADComputer -Passthru -Name %q", m.Name)
-
-	if m.SAMAccountName != "" {
-		cmd = fmt.Sprintf("%s -SamAccountName %q", cmd, m.SAMAccountName)
-	}
-
-	if m.Path != "" {
-		cmd = fmt.Sprintf("%s -Path %q", cmd, m.Path)
-	}
-
-	if m.Description != "" {
-		cmd = fmt.Sprintf("%s -Description %q", cmd, m.Description)
-	}
-
-	result, err := RunPSCommand(conf, "creating the computer object", cmd, JSONOutput())
+	result, err := RunPSCommand(conf, "creating the computer object", newComputerCommand(m), JSONOutput())
 	if err != nil {
 		return "", err
 	}
@@ -94,7 +105,7 @@ func (m *Computer) Update(conf *config.ProviderConf, changes map[string]any) err
 	}
 
 	if path, ok := changes["container"]; ok {
-		cmd := fmt.Sprintf("Move-AdObject -Identity %q -TargetPath %q", m.GUID, path.(string))
+		cmd := moveObjectCommand(m.GUID, path.(string))
 		conn, err := conf.AcquireWinRMClient()
 		if err != nil {
 			return fmt.Errorf("while acquiring winrm client: %s", err)
@@ -106,12 +117,7 @@ func (m *Computer) Update(conf *config.ProviderConf, changes map[string]any) err
 	}
 
 	if description, ok := changes["description"]; ok {
-		if description == "" {
-			description = "$null"
-		} else {
-			description = fmt.Sprintf("%q", description)
-		}
-		cmd := fmt.Sprintf("Set-ADComputer -Identity %q -Description %s", m.GUID, description)
+		cmd := setComputerDescriptionCommand(m.GUID, description.(string))
 		conn, err := conf.AcquireWinRMClient()
 		if err != nil {
 			return fmt.Errorf("while acquiring winrm client: %s", err)
@@ -123,6 +129,12 @@ func (m *Computer) Update(conf *config.ProviderConf, changes map[string]any) err
 	}
 
 	return nil
+}
+
+// setComputerDescriptionCommand renders the Set-ADComputer call for a raw
+// description. An empty one clears the attribute with $null.
+func setComputerDescriptionCommand(guid, description string) string {
+	return fmt.Sprintf("Set-ADComputer -Identity %q %s", guid, parameterArgument("Description", SanitiseString(description)))
 }
 
 // Delete deletes an existing Computer objects from the AD tree
