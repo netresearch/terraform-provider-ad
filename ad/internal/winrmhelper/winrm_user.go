@@ -263,7 +263,7 @@ func (u *User) ModifyUser(d *schema.ResourceData, conf *config.ProviderConf) err
 					toReplace = append(toReplace, PSHashtableEntry(k, PSHashtableValue(newVal)))
 				}
 			} else {
-				toClear = append(toClear, SanitiseString(k))
+				toClear = append(toClear, k)
 			}
 		}
 
@@ -274,7 +274,7 @@ func (u *User) ModifyUser(d *schema.ResourceData, conf *config.ProviderConf) err
 		}
 
 		if len(toClear) > 0 {
-			cmds = append(cmds, fmt.Sprintf(`-Clear %s`, strings.Join(toClear, ";")))
+			cmds = append(cmds, clearAttributesArgument(toClear))
 		}
 
 		if len(toReplace) > 0 {
@@ -319,6 +319,17 @@ func (u *User) ModifyUser(d *schema.ResourceData, conf *config.ProviderConf) err
 	}
 
 	return nil
+}
+
+// clearAttributesArgument renders -Clear for raw attribute names. -Clear takes
+// an array, so the names are quoted and joined with commas; joined with ";", as
+// they were, PowerShell ran every name after the first as a command of its own.
+func clearAttributesArgument(names []string) string {
+	quoted := make([]string, len(names))
+	for i, n := range names {
+		quoted[i] = psQuote(n)
+	}
+	return "-Clear " + strings.Join(quoted, ",")
 }
 
 // resetPasswordCommand renders the Set-ADAccountPassword call. The password has
@@ -457,10 +468,17 @@ func GetUserFromResource(d *schema.ResourceData) (*User, error) {
 	return &user, nil
 }
 
+// userLookupCommand renders the Get-ADUser call for a raw identity: a GUID
+// from state, or the user_id of the data source, which may also be a SID, DN
+// or SAM account name.
+func userLookupCommand(identity string) string {
+	return fmt.Sprintf("Get-ADUser -identity %s -properties *", psQuote(identity))
+}
+
 // GetUserFromHost returns a User struct based on data
 // retrieved from the AD Domain Controller.
-func GetUserFromHost(conf *config.ProviderConf, guid string, customAttributes []string) (*User, error) {
-	cmd := fmt.Sprintf("Get-ADUser -identity %q -properties *", guid)
+func GetUserFromHost(conf *config.ProviderConf, identity string, customAttributes []string) (*User, error) {
+	cmd := userLookupCommand(identity)
 	result, err := RunPSCommand(conf, "retrieving the user", cmd, JSONOutput())
 	if err != nil {
 		return nil, err

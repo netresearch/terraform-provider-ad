@@ -125,7 +125,7 @@ func setOrgUnitCommand(dn string, changes map[string]any) string {
 // Update updates an existing OU in the AD tree
 func (o *OrgUnit) Update(conf *config.ProviderConf, changes map[string]any) error {
 	if o.DistinguishedName == "" {
-		return fmt.Errorf("Cannot update OU with name %q, distiguished name is empty", o.Name)
+		return fmt.Errorf("cannot update OU with name %q, distinguished name is empty", o.Name)
 	}
 	cmd := setOrgUnitCommand(o.DistinguishedName, changes)
 
@@ -183,7 +183,7 @@ func orgUnitLookupCommandByDN(dn string) string {
 // Delete deletes an existing OU from an AD tree
 func (o *OrgUnit) Delete(conf *config.ProviderConf) error {
 	if o.DistinguishedName == "" {
-		return fmt.Errorf("Cannot remove OU with name %q, distiguished name is empty", o.Name)
+		return fmt.Errorf("cannot remove OU with name %q, distinguished name is empty", o.Name)
 	}
 	var cmds []string
 	subCmds := []string{

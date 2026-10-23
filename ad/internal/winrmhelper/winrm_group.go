@@ -129,10 +129,17 @@ func GetGroupFromResource(d *schema.ResourceData) *Group {
 	return &g
 }
 
+// groupLookupCommand renders the Get-ADGroup call for a raw identity: a GUID
+// from state, or the group_id of the data source, which may also be a SID, DN
+// or SAM account name.
+func groupLookupCommand(identity string) string {
+	return fmt.Sprintf("Get-ADGroup -identity %s -properties *", psQuote(identity))
+}
+
 // GetGroupFromHost returns a Group struct based on data
 // retrieved from the AD Controller.
-func GetGroupFromHost(conf *config.ProviderConf, guid string) (*Group, error) {
-	cmd := fmt.Sprintf("Get-ADGroup -identity %q -properties *", guid)
+func GetGroupFromHost(conf *config.ProviderConf, identity string) (*Group, error) {
+	cmd := groupLookupCommand(identity)
 	result, err := RunPSCommand(conf, "retrieving the group", cmd, JSONOutput())
 	if err != nil {
 		return nil, err

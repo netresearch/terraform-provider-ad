@@ -126,6 +126,14 @@ func unmarshalGroupMembership(input []byte) ([]*GroupMember, error) {
 	return gm, nil
 }
 
+// groupMembersLookupCommand renders the Get-ADGroupMember call. group_id is a
+// raw configuration value: a GUID, SID, DN or SAM account name.
+func groupMembersLookupCommand(groupID string) string {
+	return fmt.Sprintf("Get-ADGroupMember -Identity %s", psQuote(groupID))
+}
+
+// getMembershipList renders the members for -Members. Each identifier is a raw
+// value from group_members or from the directory.
 func getMembershipList(g []*GroupMember) string {
 	out := []string{}
 	for _, member := range g {
@@ -133,14 +141,14 @@ func getMembershipList(g []*GroupMember) string {
 		// (any DN of the form CN=First Last,OU=...) break PowerShell
 		// parameter binding of -Members ("System.Object[]" /
 		// PositionalParameterNotFound).
-		out = append(out, fmt.Sprintf("%q", member.GUID))
+		out = append(out, psQuote(member.GUID))
 	}
 
 	return strings.Join(out, ",")
 }
 
 func (g *GroupMembership) getGroupMembers(conf *config.ProviderConf) ([]*GroupMember, error) {
-	cmd := fmt.Sprintf("Get-ADGroupMember -Identity %q", g.GroupGUID)
+	cmd := groupMembersLookupCommand(g.GroupGUID)
 	result, err := RunPSCommand(conf, "running Get-ADGroupMember", cmd, JSONOutput(), ForceArray())
 	if err != nil {
 		return nil, err
@@ -186,7 +194,7 @@ func chunkMembers(members []*GroupMember, budget int) [][]*GroupMember {
 
 	for _, m := range members {
 		// Each rendered member costs its quoted length plus the joining comma.
-		cost := len(fmt.Sprintf("%q", m.GUID)) + 1
+		cost := len(psQuote(m.GUID)) + 1
 
 		if len(current) > 0 && length+cost > budget {
 			chunks = append(chunks, current)
@@ -208,7 +216,7 @@ func (g *GroupMembership) bulkGroupMembersOp(conf *config.ProviderConf, operatio
 
 	for _, chunk := range chunkMembers(members, maxMemberListLength) {
 		memberList := getMembershipList(chunk)
-		cmd := fmt.Sprintf("%s -Identity %q %s -Confirm:$false", operation, g.GroupGUID, memberList)
+		cmd := fmt.Sprintf("%s -Identity %s %s -Confirm:$false", operation, psQuote(g.GroupGUID), memberList)
 
 		if _, err := RunPSCommand(conf, fmt.Sprintf("running %s", operation), cmd); err != nil {
 			return err
@@ -252,7 +260,7 @@ func (g *GroupMembership) Create(conf *config.ProviderConf) error {
 	}
 
 	memberList := getMembershipList(g.GroupMembers)
-	cmds := []string{fmt.Sprintf("Add-ADGroupMember -Identity %q -Members %s", g.GroupGUID, memberList)}
+	cmds := []string{fmt.Sprintf("Add-ADGroupMember -Identity %s -Members %s", psQuote(g.GroupGUID), memberList)}
 	if _, err := RunPSCommand(conf, "running Add-ADGroupMember", strings.Join(cmds, " ")); err != nil {
 		return err
 	}
@@ -262,8 +270,8 @@ func (g *GroupMembership) Create(conf *config.ProviderConf) error {
 
 func (g *GroupMembership) Delete(conf *config.ProviderConf) error {
 	subCmdOpt := NewPSCommandOpts(conf, SkipCredentialPreamble())
-	subcmd := NewPSCommand([]string{fmt.Sprintf("Get-AdGroupMember %q", g.GroupGUID)}, subCmdOpt)
-	cmd := fmt.Sprintf("Remove-ADGroupMember %q -Members (%s) -Confirm:$false", g.GroupGUID, subcmd.String())
+	subcmd := NewPSCommand([]string{fmt.Sprintf("Get-AdGroupMember %s", psQuote(g.GroupGUID))}, subCmdOpt)
+	cmd := fmt.Sprintf("Remove-ADGroupMember %s -Members (%s) -Confirm:$false", psQuote(g.GroupGUID), subcmd.String())
 
 	// A group that has no members left makes Remove-ADGroupMember reject its
 	// empty -Members list, which for a destroy is the state we wanted.
