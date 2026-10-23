@@ -387,12 +387,20 @@ func (u *User) ModifyUser(d *schema.ResourceData, conf *config.ProviderConf) err
 	return nil
 }
 
+// psDoubleQuoteMarks escapes the typographic double quotes, which PowerShell
+// also reads as string delimiters and SanitiseString leaves alone.
+var psDoubleQuoteMarks = strings.NewReplacer(
+	"\u201c", "`\u201c", // “
+	"\u201d", "`\u201d", // ”
+	"\u201e", "`\u201e", // „
+)
+
 // renameUserCommand builds the Rename-ADObject call for a new name that
 // SanitiseString has already escaped. The name goes into plain double quotes,
 // as the Set-ADUser parameters do: %q would escape it a second time with Go
 // rules, which PowerShell does not read.
 func renameUserCommand(guid, sanitisedName string) string {
-	return fmt.Sprintf(`Rename-ADObject -Identity %q -NewName "%s"`, guid, sanitisedName)
+	return fmt.Sprintf(`Rename-ADObject -Identity %q -NewName "%s"`, guid, psDoubleQuoteMarks.Replace(sanitisedName))
 }
 
 // DeleteUser deletes an AD user by calling Remove-ADUser
