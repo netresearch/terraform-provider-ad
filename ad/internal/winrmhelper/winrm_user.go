@@ -270,7 +270,6 @@ func (u *User) ModifyUser(d *schema.ResourceData, conf *config.ProviderConf) err
 		"street_address":   "StreetAddress",
 		"surname":          "Surname",
 		"title":            "Title",
-		"username":         "Username",
 	}
 
 	cmds := []string{fmt.Sprintf("Set-ADUser -Identity %q", u.GUID)}
@@ -364,6 +363,15 @@ func (u *User) ModifyUser(d *schema.ResourceData, conf *config.ProviderConf) err
 	if d.HasChange("initial_password") || d.HasChange("initial_password_wo_version") {
 		cmd := fmt.Sprintf("Set-ADAccountPassword -Identity %q -Reset -NewPassword (ConvertTo-SecureString -AsPlainText %s -Force)", u.GUID, strconv.Quote(u.Password))
 		if _, err := RunPSCommand(conf, "setting the user's password", cmd, SecretPassword(u.Password)); err != nil {
+			return err
+		}
+	}
+
+	// username is the object's name (CN). Set-ADUser has no parameter for it, so
+	// a change goes through Rename-ADObject, as it does for ad_group.
+	if d.HasChange("username") {
+		cmd := fmt.Sprintf("Rename-ADObject -Identity %q -NewName %q", u.GUID, SanitiseTFInput(d, "username"))
+		if _, err := RunPSCommand(conf, "renaming the user", cmd); err != nil {
 			return err
 		}
 	}

@@ -121,7 +121,7 @@ resource "ad_user" "u2" {
 - `surname` (String) Specifies the user's last name or surname. This parameter sets the Surname property of a user object.
 - `title` (String) Specifies the user's title. This parameter sets the Title property of a user object
 - `trusted_for_delegation` (Boolean) If set to true, the user account is trusted for Kerberos delegation. A service that runs under an account that is trusted for Kerberos delegation can assume the identity of a client requesting the service. This parameter sets the TrustedForDelegation property of an account object.
-- `username` (String) Set a username for the user. This parameter is the equivalent to the -Name parameter of New-ADUser cmdlet.
+- `username` (String) Set a username for the user. This parameter is the equivalent to the -Name parameter of New-ADUser cmdlet. If it is not set, the part of `principal_name` before the `@` is used on create, and the name read from AD is kept afterwards. Changing it renames the user object with Rename-ADObject.
 
 ### Read-Only
 

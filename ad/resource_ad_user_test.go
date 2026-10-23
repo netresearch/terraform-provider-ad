@@ -203,6 +203,46 @@ func TestAccResourceADUser_modify(t *testing.T) {
 	})
 }
 
+// TestAccResourceADUser_rename changes username, the object's name (CN). Set-ADUser
+// has no parameter for it, so the update must go through Rename-ADObject.
+func TestAccResourceADUser_rename(t *testing.T) {
+	envVars := []string{
+		"TF_VAR_ad_user_display_name",
+		"TF_VAR_ad_user_sam",
+		"TF_VAR_ad_user_password",
+		"TF_VAR_ad_user_principal_name",
+		"TF_VAR_ad_user_container",
+	}
+
+	sam := os.Getenv("TF_VAR_ad_user_sam")
+	name := fmt.Sprintf("%scn", sam)
+	renamedName := fmt.Sprintf("%scnrenamed", sam)
+	resourceName := "ad_user.a"
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:  func() { testAccPreCheck(t, envVars) },
+		Providers: testAccProviders,
+		CheckDestroy: resource.ComposeTestCheckFunc(
+			testAccResourceADUserExists(resourceName, sam, false),
+		),
+		Steps: []resource.TestStep{
+			{
+				Config: testAccResourceADUserConfigUsername(name),
+				Check: resource.ComposeTestCheckFunc(
+					testAccResourceADUserName(resourceName, name),
+				),
+			},
+			{
+				Config: testAccResourceADUserConfigUsername(renamedName),
+				Check: resource.ComposeTestCheckFunc(
+					testAccResourceADUserName(resourceName, renamedName),
+					testAccResourceADUserExists(resourceName, sam, true),
+				),
+			},
+		},
+	})
+}
+
 func TestAccResourceADUser_UAC(t *testing.T) {
 	envVars := []string{
 		"TF_VAR_ad_user_display_name",
@@ -274,6 +314,14 @@ func testAccResourceADUserConfigBasic(usernameSuffix string) string {
  	}`, defaultVariablesSection(), defaultUserSection(usernameSuffix, fmt.Sprintf("%q",
 		os.Getenv("TF_VAR_ad_user_container"))))
 
+}
+
+func testAccResourceADUserConfigUsername(username string) string {
+	return fmt.Sprintf(`%s
+	resource "ad_user" "a" {%s
+	  username = %q
+ 	}`, defaultVariablesSection(), defaultUserSection("", fmt.Sprintf("%q",
+		os.Getenv("TF_VAR_ad_user_container"))), username)
 }
 
 func testAccResourceADUserConfigAttributes() string {
@@ -394,6 +442,20 @@ func testAccResourceADUserExists(name, username string, expected bool) resource.
 
 		if u.SAMAccountName != username {
 			return fmt.Errorf("username from LDAP does not match expected username, %s != %s", u.SAMAccountName, username)
+		}
+		return nil
+	}
+}
+
+// testAccResourceADUserName checks the object's name (CN), which username sets.
+func testAccResourceADUserName(name, expected string) resource.TestCheckFunc {
+	return func(s *terraform.State) error {
+		u, err := retrieveADUserFromRunningState(name, s, nil)
+		if err != nil {
+			return err
+		}
+		if u.Username != expected {
+			return fmt.Errorf("name from LDAP does not match expected name, %s != %s", u.Username, expected)
 		}
 		return nil
 	}

@@ -248,8 +248,8 @@ func resourceADUser() *schema.Resource {
 			"username": {
 				Type:        schema.TypeString,
 				Optional:    true,
-				Default:     false,
-				Description: "Set a username for the user. This parameter is the equivalent to the -Name parameter of New-ADUser cmdlet.",
+				Computed:    true,
+				Description: "Set a username for the user. This parameter is the equivalent to the -Name parameter of New-ADUser cmdlet. If it is not set, the part of `principal_name` before the `@` is used on create, and the name read from AD is kept afterwards. Changing it renames the user object with Rename-ADObject.",
 			},
 			"custom_attributes": {
 				Type:             schema.TypeString,
