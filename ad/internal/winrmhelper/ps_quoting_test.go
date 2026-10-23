@@ -81,6 +81,15 @@ func TestNewUserCommandQuotesEveryFieldOnce(t *testing.T) {
 	if needle := "-AsPlainText " + hostileQuoted + " -Force"; !strings.Contains(cmd, needle) {
 		t.Errorf("the password is not quoted once\ncommand: %s", cmd)
 	}
+
+	// The country code is upper-cased, so it gets a plain value of its own.
+	cmd, err = newUserCommand(&User{Username: "u", Country: "de"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(cmd, `-Country "DE"`) {
+		t.Errorf("the country is not rendered upper-cased and quoted once\ncommand: %s", cmd)
+	}
 }
 
 func TestNewGroupCommandQuotesEveryFieldOnce(t *testing.T) {
@@ -301,48 +310,79 @@ func commandQuotingViolations(fset *token.FileSet, file *ast.File) []string {
 		if !ok {
 			return true
 		}
-		if id, ok := call.Fun.(*ast.Ident); ok && id.Name == "RunPSCommand" && len(call.Args) > 1 {
-			if what, ok := call.Args[1].(*ast.CallExpr); ok {
-				skip[what] = true
-			}
+		if what := runPSCommandWhat(call); what != nil {
+			skip[what] = true
 		}
-		sel, ok := call.Fun.(*ast.SelectorExpr)
-		if !ok || sel.Sel.Name != "Sprintf" || skip[call] || len(call.Args) == 0 {
-			return true
-		}
-		lit, ok := call.Args[0].(*ast.BasicLit)
-		if !ok {
-			return true
-		}
-		format, err := strconv.Unquote(lit.Value)
-		if err != nil {
-			return true
-		}
-		pos := fset.Position(call.Pos())
-		if strings.Contains(format, `"%s"`) {
-			found = append(found, pos.String()+`: "%s" wraps a value in quotes without escaping it; use psQuote or psQuoteSanitised`)
-		}
-		verb := 0
-		for i := 0; i < len(format); i++ {
-			if format[i] != '%' || i+1 >= len(format) {
-				continue
-			}
-			i++
-			if format[i] == '%' {
-				continue
-			}
-			verb++
-			if format[i] == 'q' && verb < len(call.Args) {
-				arg := call.Args[verb]
-				text := exprSource(fset, arg)
-				if !quoteVerbAllowed.MatchString(text) {
-					found = append(found, pos.String()+": %q formats "+text+"; use psQuote or psQuoteSanitised")
-				}
-			}
+		if format, ok := sprintfFormat(call); ok && !skip[call] {
+			found = append(found, formatViolations(fset, call, format)...)
 		}
 		return true
 	})
 	return found
+}
+
+// runPSCommandWhat returns the Sprintf call that renders the "what" argument
+// of a RunPSCommand call, or nil.
+func runPSCommandWhat(call *ast.CallExpr) *ast.CallExpr {
+	id, ok := call.Fun.(*ast.Ident)
+	if !ok || id.Name != "RunPSCommand" || len(call.Args) < 2 {
+		return nil
+	}
+	what, _ := call.Args[1].(*ast.CallExpr)
+	return what
+}
+
+// sprintfFormat returns the literal format string of a fmt.Sprintf call.
+func sprintfFormat(call *ast.CallExpr) (string, bool) {
+	sel, ok := call.Fun.(*ast.SelectorExpr)
+	if !ok || sel.Sel.Name != "Sprintf" || len(call.Args) == 0 {
+		return "", false
+	}
+	lit, ok := call.Args[0].(*ast.BasicLit)
+	if !ok {
+		return "", false
+	}
+	format, err := strconv.Unquote(lit.Value)
+	return format, err == nil
+}
+
+// formatViolations checks one Sprintf call against the two rules.
+func formatViolations(fset *token.FileSet, call *ast.CallExpr, format string) []string {
+	var found []string
+	pos := fset.Position(call.Pos()).String()
+	if strings.Contains(format, `"%s"`) {
+		found = append(found, pos+`: "%s" wraps a value in quotes without escaping it; use psQuote or psQuoteSanitised`)
+	}
+	for _, argIndex := range quoteVerbArgs(format) {
+		if argIndex >= len(call.Args) {
+			continue
+		}
+		if text := exprSource(fset, call.Args[argIndex]); !quoteVerbAllowed.MatchString(text) {
+			found = append(found, pos+": %q formats "+text+"; use psQuote or psQuoteSanitised")
+		}
+	}
+	return found
+}
+
+// quoteVerbArgs returns the call-argument index of every %q verb in format.
+// Argument 0 is the format itself, so the first verb maps to index 1.
+func quoteVerbArgs(format string) []int {
+	var out []int
+	verb := 0
+	for i := 0; i+1 < len(format); i++ {
+		if format[i] != '%' {
+			continue
+		}
+		i++
+		if format[i] == '%' {
+			continue
+		}
+		verb++
+		if format[i] == 'q' {
+			out = append(out, verb)
+		}
+	}
+	return out
 }
 
 func exprSource(fset *token.FileSet, e ast.Expr) string {

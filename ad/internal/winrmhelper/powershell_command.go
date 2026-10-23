@@ -333,12 +333,15 @@ func NewPSCommand(cmds []string, opts CreatePSCommandOpts) *PSCommand {
 // are replaced literally, which is the only reliable way: the patterns below
 // anchor on the shape of the rendered command and miss it entirely when a
 // password contains a double quote, or when PowerShell truncated the line.
+// redactedMarker replaces a secret in every log and error text.
+const redactedMarker = "<REDACTED>"
+
 func redactSensitiveData(cmd string, winrmPassword string, secrets ...string) string {
 	logStr := cmd
 
 	for _, secret := range secrets {
 		if secret != "" {
-			logStr = strings.ReplaceAll(logStr, secret, "<REDACTED>")
+			logStr = strings.ReplaceAll(logStr, secret, redactedMarker)
 		}
 	}
 
@@ -348,9 +351,9 @@ func redactSensitiveData(cmd string, winrmPassword string, secrets ...string) st
 	// the escaped one first.
 	if winrmPassword != "" {
 		if escaped := SanitiseString(winrmPassword); escaped != winrmPassword {
-			logStr = strings.ReplaceAll(logStr, escaped, "<REDACTED>")
+			logStr = strings.ReplaceAll(logStr, escaped, redactedMarker)
 		}
-		logStr = strings.ReplaceAll(logStr, winrmPassword, "<REDACTED>")
+		logStr = strings.ReplaceAll(logStr, winrmPassword, redactedMarker)
 	}
 
 	// Redact passwords in -AccountPassword parameter using regex

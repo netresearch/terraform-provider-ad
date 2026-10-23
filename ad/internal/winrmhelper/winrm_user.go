@@ -74,13 +74,20 @@ func newUserCommand(u *User) (string, error) {
 	cmds = append(cmds, fmt.Sprintf("-SmartcardLogonRequired $%t", u.SmartcardLogonRequired))
 	cmds = append(cmds, fmt.Sprintf("-TrustedForDelegation $%t", u.TrustedForDelegation))
 
-	if u.SAMAccountName != "" {
-		cmds = append(cmds, fmt.Sprintf("-SamAccountName %s", psQuoteSanitised(u.SAMAccountName)))
+	// Optional text parameters, in the order New-ADUser has always received
+	// them. An empty value leaves the parameter out.
+	appendText := func(params []userParam) {
+		for _, p := range params {
+			if p.value != "" {
+				cmds = append(cmds, fmt.Sprintf("-%s %s", p.name, psQuoteSanitised(p.value)))
+			}
+		}
 	}
 
-	if u.PrincipalName != "" {
-		cmds = append(cmds, fmt.Sprintf("-UserPrincipalName %s", psQuoteSanitised(u.PrincipalName)))
-	}
+	appendText([]userParam{
+		{"SamAccountName", u.SAMAccountName},
+		{"UserPrincipalName", u.PrincipalName},
+	})
 
 	if u.Password != "" {
 		// psQuoteSanitised, the rendering SecretPassword registers, so what is
@@ -88,122 +95,37 @@ func newUserCommand(u *User) (string, error) {
 		cmds = append(cmds, fmt.Sprintf("-AccountPassword (ConvertTo-SecureString -AsPlainText %s -Force)", psQuoteSanitised(u.Password)))
 	}
 
-	if u.DisplayName != "" {
-		cmds = append(cmds, fmt.Sprintf("-DisplayName %s", psQuoteSanitised(u.DisplayName)))
-	}
-
-	if u.Container != "" {
-		cmds = append(cmds, fmt.Sprintf("-Path %s", psQuoteSanitised(u.Container)))
-	}
-
-	if u.City != "" {
-		cmds = append(cmds, fmt.Sprintf("-City %s", psQuoteSanitised(u.City)))
-	}
-
-	if u.Company != "" {
-		cmds = append(cmds, fmt.Sprintf("-Company %s", psQuoteSanitised(u.Company)))
-	}
-
-	if u.Country != "" {
-		country := strings.ToUpper(u.Country)
-		cmds = append(cmds, fmt.Sprintf("-Country %s", psQuoteSanitised(country)))
-	}
-
-	if u.Department != "" {
-		cmds = append(cmds, fmt.Sprintf("-Department %s", psQuoteSanitised(u.Department)))
-	}
-
-	if u.Description != "" {
-		cmds = append(cmds, fmt.Sprintf("-Description %s", psQuoteSanitised(u.Description)))
-	}
-
-	if u.Division != "" {
-		cmds = append(cmds, fmt.Sprintf("-Division %s", psQuoteSanitised(u.Division)))
-	}
-
-	if u.EmailAddress != "" {
-		cmds = append(cmds, fmt.Sprintf("-EmailAddress %s", psQuoteSanitised(u.EmailAddress)))
-	}
-
-	if u.EmployeeID != "" {
-		cmds = append(cmds, fmt.Sprintf("-EmployeeID %s", psQuoteSanitised(u.EmployeeID)))
-	}
-
-	if u.EmployeeNumber != "" {
-		cmds = append(cmds, fmt.Sprintf("-EmployeeNumber %s", psQuoteSanitised(u.EmployeeNumber)))
-	}
-
-	if u.Fax != "" {
-		cmds = append(cmds, fmt.Sprintf("-Fax %s", psQuoteSanitised(u.Fax)))
-	}
-
-	if u.GivenName != "" {
-		cmds = append(cmds, fmt.Sprintf("-GivenName %s", psQuoteSanitised(u.GivenName)))
-	}
-
-	if u.HomeDirectory != "" {
-		cmds = append(cmds, fmt.Sprintf("-HomeDirectory %s", psQuoteSanitised(u.HomeDirectory)))
-	}
-
-	if u.HomeDrive != "" {
-		cmds = append(cmds, fmt.Sprintf("-HomeDrive %s", psQuoteSanitised(u.HomeDrive)))
-	}
-
-	if u.HomePhone != "" {
-		cmds = append(cmds, fmt.Sprintf("-HomePhone %s", psQuoteSanitised(u.HomePhone)))
-	}
-
-	if u.HomePage != "" {
-		cmds = append(cmds, fmt.Sprintf("-HomePage %s", psQuoteSanitised(u.HomePage)))
-	}
-
-	if u.Initials != "" {
-		cmds = append(cmds, fmt.Sprintf("-Initials %s", psQuoteSanitised(u.Initials)))
-	}
-
-	if u.MobilePhone != "" {
-		cmds = append(cmds, fmt.Sprintf("-MobilePhone %s", psQuoteSanitised(u.MobilePhone)))
-	}
-
-	if u.Office != "" {
-		cmds = append(cmds, fmt.Sprintf("-Office %s", psQuoteSanitised(u.Office)))
-	}
-
-	if u.OfficePhone != "" {
-		cmds = append(cmds, fmt.Sprintf("-OfficePhone %s", psQuoteSanitised(u.OfficePhone)))
-	}
-
-	if u.Organization != "" {
-		cmds = append(cmds, fmt.Sprintf("-Organization %s", psQuoteSanitised(u.Organization)))
-	}
-
-	if u.OtherName != "" {
-		cmds = append(cmds, fmt.Sprintf("-OtherName %s", psQuoteSanitised(u.OtherName)))
-	}
-
-	if u.POBox != "" {
-		cmds = append(cmds, fmt.Sprintf("-POBox %s", psQuoteSanitised(u.POBox)))
-	}
-
-	if u.PostalCode != "" {
-		cmds = append(cmds, fmt.Sprintf("-PostalCode %s", psQuoteSanitised(u.PostalCode)))
-	}
-
-	if u.State != "" {
-		cmds = append(cmds, fmt.Sprintf("-State %s", psQuoteSanitised(u.State)))
-	}
-
-	if u.StreetAddress != "" {
-		cmds = append(cmds, fmt.Sprintf("-StreetAddress %s", psQuoteSanitised(u.StreetAddress)))
-	}
-
-	if u.Surname != "" {
-		cmds = append(cmds, fmt.Sprintf("-Surname %s", psQuoteSanitised(u.Surname)))
-	}
-
-	if u.Title != "" {
-		cmds = append(cmds, fmt.Sprintf("-Title %s", psQuoteSanitised(u.Title)))
-	}
+	appendText([]userParam{
+		{"DisplayName", u.DisplayName},
+		{"Path", u.Container},
+		{"City", u.City},
+		{"Company", u.Company},
+		{"Country", strings.ToUpper(u.Country)},
+		{"Department", u.Department},
+		{"Description", u.Description},
+		{"Division", u.Division},
+		{"EmailAddress", u.EmailAddress},
+		{"EmployeeID", u.EmployeeID},
+		{"EmployeeNumber", u.EmployeeNumber},
+		{"Fax", u.Fax},
+		{"GivenName", u.GivenName},
+		{"HomeDirectory", u.HomeDirectory},
+		{"HomeDrive", u.HomeDrive},
+		{"HomePhone", u.HomePhone},
+		{"HomePage", u.HomePage},
+		{"Initials", u.Initials},
+		{"MobilePhone", u.MobilePhone},
+		{"Office", u.Office},
+		{"OfficePhone", u.OfficePhone},
+		{"Organization", u.Organization},
+		{"OtherName", u.OtherName},
+		{"POBox", u.POBox},
+		{"PostalCode", u.PostalCode},
+		{"State", u.State},
+		{"StreetAddress", u.StreetAddress},
+		{"Surname", u.Surname},
+		{"Title", u.Title},
+	})
 
 	if u.CustomAttributes != nil {
 		attrs, err := u.getOtherAttributes()
@@ -215,6 +137,10 @@ func newUserCommand(u *User) (string, error) {
 
 	return strings.Join(cmds, " "), nil
 }
+
+// userParam is one optional New-ADUser text parameter and its already
+// escaped value.
+type userParam struct{ name, value string }
 
 // NewUser creates the user by running the New-ADUser powershell command
 func (u *User) NewUser(conf *config.ProviderConf) (string, error) {
