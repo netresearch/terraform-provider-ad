@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log"
 	"reflect"
-	"strconv"
 	"strings"
 
 	"github.com/hashicorp/go-cty/cty"
@@ -64,14 +63,10 @@ type User struct {
 	CustomAttributes       map[string]any
 }
 
-// NewUser creates the user by running the New-ADUser powershell command
-func (u *User) NewUser(conf *config.ProviderConf) (string, error) {
-	if u.Username == "" {
-		return "", fmt.Errorf("user principal name required")
-	}
-
-	log.Printf("Adding user with UPN: %q", u.PrincipalName)
-	cmds := []string{fmt.Sprintf("New-ADUser -Passthru -Name %q", u.Username)}
+// newUserCommand renders the New-ADUser call for u, whose text fields hold
+// values that SanitiseString has already escaped.
+func newUserCommand(u *User) (string, error) {
+	cmds := []string{fmt.Sprintf("New-ADUser -Passthru -Name %s", psQuoteSanitised(u.Username))}
 
 	cmds = append(cmds, fmt.Sprintf("-CannotChangePassword $%t", u.CannotChangePassword))
 	cmds = append(cmds, fmt.Sprintf("-PasswordNeverExpires $%t", u.PasswordNeverExpires))
@@ -80,135 +75,134 @@ func (u *User) NewUser(conf *config.ProviderConf) (string, error) {
 	cmds = append(cmds, fmt.Sprintf("-TrustedForDelegation $%t", u.TrustedForDelegation))
 
 	if u.SAMAccountName != "" {
-		cmds = append(cmds, fmt.Sprintf("-SamAccountName %q", u.SAMAccountName))
+		cmds = append(cmds, fmt.Sprintf("-SamAccountName %s", psQuoteSanitised(u.SAMAccountName)))
 	}
 
 	if u.PrincipalName != "" {
-		cmds = append(cmds, fmt.Sprintf("-UserPrincipalName %q", u.PrincipalName))
+		cmds = append(cmds, fmt.Sprintf("-UserPrincipalName %s", psQuoteSanitised(u.PrincipalName)))
 	}
 
 	if u.Password != "" {
-		// strconv.Quote, not %q with the password as the verb's argument: the
-		// same rendering SecretPassword registers, so what is embedded and what
-		// is redacted cannot drift apart.
-		cmds = append(cmds, fmt.Sprintf("-AccountPassword (ConvertTo-SecureString -AsPlainText %s -Force)", strconv.Quote(u.Password)))
+		// psQuoteSanitised, the rendering SecretPassword registers, so what is
+		// embedded and what is redacted cannot drift apart.
+		cmds = append(cmds, fmt.Sprintf("-AccountPassword (ConvertTo-SecureString -AsPlainText %s -Force)", psQuoteSanitised(u.Password)))
 	}
 
 	if u.DisplayName != "" {
-		cmds = append(cmds, fmt.Sprintf("-DisplayName %q", u.DisplayName))
+		cmds = append(cmds, fmt.Sprintf("-DisplayName %s", psQuoteSanitised(u.DisplayName)))
 	}
 
 	if u.Container != "" {
-		cmds = append(cmds, fmt.Sprintf("-Path %q", u.Container))
+		cmds = append(cmds, fmt.Sprintf("-Path %s", psQuoteSanitised(u.Container)))
 	}
 
 	if u.City != "" {
-		cmds = append(cmds, fmt.Sprintf("-City %q", u.City))
+		cmds = append(cmds, fmt.Sprintf("-City %s", psQuoteSanitised(u.City)))
 	}
 
 	if u.Company != "" {
-		cmds = append(cmds, fmt.Sprintf("-Company %q", u.Company))
+		cmds = append(cmds, fmt.Sprintf("-Company %s", psQuoteSanitised(u.Company)))
 	}
 
 	if u.Country != "" {
 		country := strings.ToUpper(u.Country)
-		cmds = append(cmds, fmt.Sprintf("-Country %q", country))
+		cmds = append(cmds, fmt.Sprintf("-Country %s", psQuoteSanitised(country)))
 	}
 
 	if u.Department != "" {
-		cmds = append(cmds, fmt.Sprintf("-Department %q", u.Department))
+		cmds = append(cmds, fmt.Sprintf("-Department %s", psQuoteSanitised(u.Department)))
 	}
 
 	if u.Description != "" {
-		cmds = append(cmds, fmt.Sprintf("-Description %q", u.Description))
+		cmds = append(cmds, fmt.Sprintf("-Description %s", psQuoteSanitised(u.Description)))
 	}
 
 	if u.Division != "" {
-		cmds = append(cmds, fmt.Sprintf("-Division %q", u.Division))
+		cmds = append(cmds, fmt.Sprintf("-Division %s", psQuoteSanitised(u.Division)))
 	}
 
 	if u.EmailAddress != "" {
-		cmds = append(cmds, fmt.Sprintf("-EmailAddress %q", u.EmailAddress))
+		cmds = append(cmds, fmt.Sprintf("-EmailAddress %s", psQuoteSanitised(u.EmailAddress)))
 	}
 
 	if u.EmployeeID != "" {
-		cmds = append(cmds, fmt.Sprintf("-EmployeeID %q", u.EmployeeID))
+		cmds = append(cmds, fmt.Sprintf("-EmployeeID %s", psQuoteSanitised(u.EmployeeID)))
 	}
 
 	if u.EmployeeNumber != "" {
-		cmds = append(cmds, fmt.Sprintf("-EmployeeNumber %q", u.EmployeeNumber))
+		cmds = append(cmds, fmt.Sprintf("-EmployeeNumber %s", psQuoteSanitised(u.EmployeeNumber)))
 	}
 
 	if u.Fax != "" {
-		cmds = append(cmds, fmt.Sprintf("-Fax %q", u.Fax))
+		cmds = append(cmds, fmt.Sprintf("-Fax %s", psQuoteSanitised(u.Fax)))
 	}
 
 	if u.GivenName != "" {
-		cmds = append(cmds, fmt.Sprintf("-GivenName %q", u.GivenName))
+		cmds = append(cmds, fmt.Sprintf("-GivenName %s", psQuoteSanitised(u.GivenName)))
 	}
 
 	if u.HomeDirectory != "" {
-		cmds = append(cmds, fmt.Sprintf("-HomeDirectory %q", u.HomeDirectory))
+		cmds = append(cmds, fmt.Sprintf("-HomeDirectory %s", psQuoteSanitised(u.HomeDirectory)))
 	}
 
 	if u.HomeDrive != "" {
-		cmds = append(cmds, fmt.Sprintf("-HomeDrive %q", u.HomeDrive))
+		cmds = append(cmds, fmt.Sprintf("-HomeDrive %s", psQuoteSanitised(u.HomeDrive)))
 	}
 
 	if u.HomePhone != "" {
-		cmds = append(cmds, fmt.Sprintf("-HomePhone %q", u.HomePhone))
+		cmds = append(cmds, fmt.Sprintf("-HomePhone %s", psQuoteSanitised(u.HomePhone)))
 	}
 
 	if u.HomePage != "" {
-		cmds = append(cmds, fmt.Sprintf("-HomePage %q", u.HomePage))
+		cmds = append(cmds, fmt.Sprintf("-HomePage %s", psQuoteSanitised(u.HomePage)))
 	}
 
 	if u.Initials != "" {
-		cmds = append(cmds, fmt.Sprintf("-Initials %q", u.Initials))
+		cmds = append(cmds, fmt.Sprintf("-Initials %s", psQuoteSanitised(u.Initials)))
 	}
 
 	if u.MobilePhone != "" {
-		cmds = append(cmds, fmt.Sprintf("-MobilePhone %q", u.MobilePhone))
+		cmds = append(cmds, fmt.Sprintf("-MobilePhone %s", psQuoteSanitised(u.MobilePhone)))
 	}
 
 	if u.Office != "" {
-		cmds = append(cmds, fmt.Sprintf("-Office %q", u.Office))
+		cmds = append(cmds, fmt.Sprintf("-Office %s", psQuoteSanitised(u.Office)))
 	}
 
 	if u.OfficePhone != "" {
-		cmds = append(cmds, fmt.Sprintf("-OfficePhone %q", u.OfficePhone))
+		cmds = append(cmds, fmt.Sprintf("-OfficePhone %s", psQuoteSanitised(u.OfficePhone)))
 	}
 
 	if u.Organization != "" {
-		cmds = append(cmds, fmt.Sprintf("-Organization %q", u.Organization))
+		cmds = append(cmds, fmt.Sprintf("-Organization %s", psQuoteSanitised(u.Organization)))
 	}
 
 	if u.OtherName != "" {
-		cmds = append(cmds, fmt.Sprintf("-OtherName %q", u.OtherName))
+		cmds = append(cmds, fmt.Sprintf("-OtherName %s", psQuoteSanitised(u.OtherName)))
 	}
 
 	if u.POBox != "" {
-		cmds = append(cmds, fmt.Sprintf("-POBox %q", u.POBox))
+		cmds = append(cmds, fmt.Sprintf("-POBox %s", psQuoteSanitised(u.POBox)))
 	}
 
 	if u.PostalCode != "" {
-		cmds = append(cmds, fmt.Sprintf("-PostalCode %q", u.PostalCode))
+		cmds = append(cmds, fmt.Sprintf("-PostalCode %s", psQuoteSanitised(u.PostalCode)))
 	}
 
 	if u.State != "" {
-		cmds = append(cmds, fmt.Sprintf("-State %q", u.State))
+		cmds = append(cmds, fmt.Sprintf("-State %s", psQuoteSanitised(u.State)))
 	}
 
 	if u.StreetAddress != "" {
-		cmds = append(cmds, fmt.Sprintf("-StreetAddress %q", u.StreetAddress))
+		cmds = append(cmds, fmt.Sprintf("-StreetAddress %s", psQuoteSanitised(u.StreetAddress)))
 	}
 
 	if u.Surname != "" {
-		cmds = append(cmds, fmt.Sprintf("-Surname %q", u.Surname))
+		cmds = append(cmds, fmt.Sprintf("-Surname %s", psQuoteSanitised(u.Surname)))
 	}
 
 	if u.Title != "" {
-		cmds = append(cmds, fmt.Sprintf("-Title %q", u.Title))
+		cmds = append(cmds, fmt.Sprintf("-Title %s", psQuoteSanitised(u.Title)))
 	}
 
 	if u.CustomAttributes != nil {
@@ -219,7 +213,22 @@ func (u *User) NewUser(conf *config.ProviderConf) (string, error) {
 		cmds = append(cmds, fmt.Sprintf("-OtherAttributes %s", attrs))
 	}
 
-	result, err := RunPSCommand(conf, "creating the user", strings.Join(cmds, " "),
+	return strings.Join(cmds, " "), nil
+}
+
+// NewUser creates the user by running the New-ADUser powershell command
+func (u *User) NewUser(conf *config.ProviderConf) (string, error) {
+	if u.Username == "" {
+		return "", fmt.Errorf("user principal name required")
+	}
+
+	log.Printf("Adding user with UPN: %q", u.PrincipalName)
+	cmd, err := newUserCommand(u)
+	if err != nil {
+		return "", err
+	}
+
+	result, err := RunPSCommand(conf, "creating the user", cmd,
 		JSONOutput(), SecretPassword(u.Password))
 	if err != nil {
 		if ErrorMentions(err, "AlreadyExists") {
@@ -280,7 +289,7 @@ func (u *User) ModifyUser(d *schema.ResourceData, conf *config.ProviderConf) err
 			if value == "" {
 				value = "$null"
 			} else {
-				value = fmt.Sprintf(`"%s"`, value)
+				value = psQuoteSanitised(value)
 			}
 			cmds = append(cmds, fmt.Sprintf(`-%s %s`, param, value))
 		}
@@ -361,7 +370,7 @@ func (u *User) ModifyUser(d *schema.ResourceData, conf *config.ProviderConf) err
 	// A write-only value is null in state, so it can never produce a diff of its
 	// own — initial_password_wo_version is the only signal that it changed.
 	if d.HasChange("initial_password") || d.HasChange("initial_password_wo_version") {
-		cmd := fmt.Sprintf("Set-ADAccountPassword -Identity %q -Reset -NewPassword (ConvertTo-SecureString -AsPlainText %s -Force)", u.GUID, strconv.Quote(u.Password))
+		cmd := resetPasswordCommand(u.GUID, u.Password)
 		if _, err := RunPSCommand(conf, "setting the user's password", cmd, SecretPassword(u.Password)); err != nil {
 			return err
 		}
@@ -370,15 +379,14 @@ func (u *User) ModifyUser(d *schema.ResourceData, conf *config.ProviderConf) err
 	// username is the object's name (CN). Set-ADUser has no parameter for it, so
 	// a change goes through Rename-ADObject, as it does for ad_group.
 	if d.HasChange("username") {
-		cmd := renameUserCommand(u.GUID, SanitiseTFInput(d, "username"))
+		cmd := renameObjectCommand(u.GUID, d.Get("username").(string))
 		if _, err := RunPSCommand(conf, "renaming the user", cmd); err != nil {
 			return err
 		}
 	}
 
 	if d.HasChange("container") {
-		path := d.Get("container").(string)
-		cmd := fmt.Sprintf("Move-AdObject -Identity %q -TargetPath %q", u.GUID, path)
+		cmd := moveObjectCommand(u.GUID, d.Get("container").(string))
 		if _, err := RunPSCommand(conf, "moving the user object", cmd); err != nil {
 			return err
 		}
@@ -387,20 +395,11 @@ func (u *User) ModifyUser(d *schema.ResourceData, conf *config.ProviderConf) err
 	return nil
 }
 
-// psDoubleQuoteMarks escapes the typographic double quotes, which PowerShell
-// also reads as string delimiters and SanitiseString leaves alone.
-var psDoubleQuoteMarks = strings.NewReplacer(
-	"\u201c", "`\u201c", // “
-	"\u201d", "`\u201d", // ”
-	"\u201e", "`\u201e", // „
-)
-
-// renameUserCommand builds the Rename-ADObject call for a new name that
-// SanitiseString has already escaped. The name goes into plain double quotes,
-// as the Set-ADUser parameters do: %q would escape it a second time with Go
-// rules, which PowerShell does not read.
-func renameUserCommand(guid, sanitisedName string) string {
-	return fmt.Sprintf(`Rename-ADObject -Identity %q -NewName "%s"`, guid, psDoubleQuoteMarks.Replace(sanitisedName))
+// resetPasswordCommand renders the Set-ADAccountPassword call. The password has
+// already been through SanitiseString, and SecretPassword registers the same
+// rendering for redaction.
+func resetPasswordCommand(guid, sanitisedPassword string) string {
+	return fmt.Sprintf("Set-ADAccountPassword -Identity %q -Reset -NewPassword (ConvertTo-SecureString -AsPlainText %s -Force)", guid, psQuoteSanitised(sanitisedPassword))
 }
 
 // DeleteUser deletes an AD user by calling Remove-ADUser

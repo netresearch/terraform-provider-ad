@@ -36,13 +36,14 @@ func NewOrgUnitFromResource(d *schema.ResourceData) *OrgUnit {
 }
 
 // NewOrgUnitFromHost returns a new OrgUnit struct populated from data we get from
-// the domain controller
+// the domain controller. guid (a GUID or a DN), name and path have already been
+// through SanitiseString.
 func NewOrgUnitFromHost(conf *config.ProviderConf, guid, name, path string) (*OrgUnit, error) {
 	var cmd string
 	if guid != "" {
-		cmd = fmt.Sprintf("Get-ADObject -Properties * -Identity %q", guid)
+		cmd = fmt.Sprintf("Get-ADObject -Properties * -Identity %s", psQuoteSanitised(guid))
 	} else if name != "" && path != "" {
-		cmd = fmt.Sprintf("Get-ADObject -Properties * -Name %q -Path %q", name, path)
+		cmd = fmt.Sprintf("Get-ADObject -Properties * -Name %s -Path %s", psQuoteSanitised(name), psQuoteSanitised(path))
 	} else {
 		return nil, fmt.Errorf("invalid inputs, dn or a combination of path and name are required")
 	}
@@ -59,25 +60,29 @@ func NewOrgUnitFromHost(conf *config.ProviderConf, guid, name, path string) (*Or
 	return ou, nil
 }
 
-// Create creates a new OU in the AD tree
-func (o *OrgUnit) Create(conf *config.ProviderConf) (string, error) {
-
-	cmd := "New-ADOrganizationalUnit -Passthru"
-	if o.Name == "" {
-		return "", fmt.Errorf("missing required attribute name, cannot create OU")
-	}
-	cmd = fmt.Sprintf("%s -Name %q", cmd, o.Name)
+// newOrgUnitCommand renders the New-ADOrganizationalUnit call for o, whose
+// fields hold values that SanitiseString has already escaped.
+func newOrgUnitCommand(o *OrgUnit) string {
+	cmd := fmt.Sprintf("New-ADOrganizationalUnit -Passthru -Name %s", psQuoteSanitised(o.Name))
 
 	if o.Description != "" {
-		cmd = fmt.Sprintf("%s -Description %q", cmd, o.Description)
+		cmd = fmt.Sprintf("%s -Description %s", cmd, psQuoteSanitised(o.Description))
 	}
 
 	if o.Path != "" {
-		cmd = fmt.Sprintf("%s -Path %q", cmd, o.Path)
+		cmd = fmt.Sprintf("%s -Path %s", cmd, psQuoteSanitised(o.Path))
 	}
 
-	cmd = fmt.Sprintf("%s -ProtectedFromAccidentalDeletion:$%t", cmd, o.Protected)
-	result, err := RunPSCommand(conf, "creating the OU", cmd, JSONOutput())
+	return fmt.Sprintf("%s -ProtectedFromAccidentalDeletion:$%t", cmd, o.Protected)
+}
+
+// Create creates a new OU in the AD tree
+func (o *OrgUnit) Create(conf *config.ProviderConf) (string, error) {
+
+	if o.Name == "" {
+		return "", fmt.Errorf("missing required attribute name, cannot create OU")
+	}
+	result, err := RunPSCommand(conf, "creating the OU", newOrgUnitCommand(o), JSONOutput())
 	if err != nil {
 		return "", err
 	}
@@ -94,7 +99,7 @@ func (o *OrgUnit) Update(conf *config.ProviderConf, changes map[string]any) erro
 	if o.DistinguishedName == "" {
 		return fmt.Errorf("Cannot update OU with name %q, distiguished name is empty", o.Name)
 	}
-	cmd := fmt.Sprintf("Set-ADOrganizationalUnit -Identity %q", o.DistinguishedName)
+	cmd := fmt.Sprintf("Set-ADOrganizationalUnit -Identity %s", psQuoteSanitised(o.DistinguishedName))
 
 	keyMap := map[string]string{
 		"display_name": "DisplayName",
@@ -103,7 +108,7 @@ func (o *OrgUnit) Update(conf *config.ProviderConf, changes map[string]any) erro
 
 	for k, v := range changes {
 		if paramName, ok := keyMap[k]; ok {
-			cmd = fmt.Sprintf("%s -%s %q", cmd, paramName, v.(string))
+			cmd = fmt.Sprintf("%s -%s %s", cmd, paramName, psQuote(v.(string)))
 		}
 	}
 
@@ -123,7 +128,7 @@ func (o *OrgUnit) Update(conf *config.ProviderConf, changes map[string]any) erro
 			unprotected = true
 		}
 
-		cmd := fmt.Sprintf("Move-ADObject -Identity %q -TargetPath %q", o.GUID, path.(string))
+		cmd := moveObjectCommand(o.GUID, path.(string))
 		if _, err := RunPSCommand(conf, "moving the OU object", cmd); err != nil {
 			return err
 		}
@@ -144,7 +149,7 @@ func (o *OrgUnit) Update(conf *config.ProviderConf, changes map[string]any) erro
 	}
 
 	if name, ok := changes["name"]; ok {
-		cmd = fmt.Sprintf("Rename-ADObject -Identity %q %q ", o.GUID, name.(string))
+		cmd = renameObjectCommand(o.GUID, name.(string))
 		if _, err := RunPSCommand(conf, "renaming the OU", cmd); err != nil {
 			return err
 		}
@@ -159,7 +164,7 @@ func (o *OrgUnit) Delete(conf *config.ProviderConf) error {
 	}
 	var cmds []string
 	subCmds := []string{
-		fmt.Sprintf("Get-ADObject -Properties * -Identity %q", o.DistinguishedName),
+		fmt.Sprintf("Get-ADObject -Properties * -Identity %s", psQuoteSanitised(o.DistinguishedName)),
 		"Set-ADObject -ProtectedFromAccidentalDeletion:$false -Passthru",
 		"Remove-ADOrganizationalUnit -confirm:$false",
 	}

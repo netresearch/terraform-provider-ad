@@ -7,7 +7,6 @@ import (
 	"log"
 	"regexp"
 	"slices"
-	"strconv"
 	"strings"
 
 	"github.com/hashicorp/terraform-provider-ad/ad/internal/config"
@@ -86,8 +85,8 @@ func ComposedCommand() PSOption {
 // command is redacted out of every error and log.
 //
 // It takes the password rather than the rendered text on purpose. The caller
-// embeds strconv.Quote(password), and the rule for what to register from that is
-// not obvious twice in a row: strconv.Quote("") is the two-character string `""`,
+// embeds psQuoteSanitised(password), and the rule for what to register from that
+// is not obvious twice in a row: psQuoteSanitised("") is the two-character string `""`,
 // so registering it unconditionally redacts every empty string literal the
 // provider renders — an attribute set to "", a JSON field, the lot. Keeping the
 // rendering and that exception in one place means a call site cannot get it
@@ -117,7 +116,7 @@ func SecretPassword(password string) PSOption {
 		if password == "" {
 			return
 		}
-		o.Secrets = append(o.Secrets, strconv.Quote(password))
+		o.Secrets = append(o.Secrets, psQuoteSanitised(password))
 	}
 }
 
@@ -272,6 +271,13 @@ type PSCommand struct {
 	cmd string
 }
 
+// credentialAssignments renders the two lines that put the WinRM user and
+// password into $User and $Password. Both are raw provider settings.
+func credentialAssignments(username, password string) (string, string) {
+	return fmt.Sprintf("$User = %s\n", psQuote(username)),
+		fmt.Sprintf("$Password = ConvertTo-SecureString -String %s -AsPlainText -Force\n", psQuote(password))
+}
+
 func NewPSCommand(cmds []string, opts CreatePSCommandOpts) *PSCommand {
 	if opts.InvokeCommand && opts.PassCredentials {
 		invokeCmds := []string{"Invoke-Command -Authentication Kerberos"}
@@ -285,8 +291,7 @@ func NewPSCommand(cmds []string, opts CreatePSCommandOpts) *PSCommand {
 
 	if opts.PassCredentials {
 		if !opts.SkipCredPrefix {
-			cmdUsername := fmt.Sprintf("$User = \"%s\"\n", opts.Username)
-			cmdPassword := fmt.Sprintf("$Password = ConvertTo-SecureString -String \"%s\" -AsPlainText -Force\n", opts.Password)
+			cmdUsername, cmdPassword := credentialAssignments(opts.Username, opts.Password)
 			cmds = append([]string{"$Credential = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $User, $Password\n"}, cmds...)
 			cmds = append([]string{cmdUsername}, cmds...)
 			cmds = append([]string{cmdPassword}, cmds...)
@@ -337,8 +342,14 @@ func redactSensitiveData(cmd string, winrmPassword string, secrets ...string) st
 		}
 	}
 
-	// Redact WinRM password if PassCredentials is enabled
+	// Redact WinRM password if PassCredentials is enabled. The credential
+	// preamble embeds it escaped by psQuote, which differs from the raw value
+	// whenever it holds a $, a backtick or a quote, so both forms are replaced,
+	// the escaped one first.
 	if winrmPassword != "" {
+		if escaped := SanitiseString(winrmPassword); escaped != winrmPassword {
+			logStr = strings.ReplaceAll(logStr, escaped, "<REDACTED>")
+		}
 		logStr = strings.ReplaceAll(logStr, winrmPassword, "<REDACTED>")
 	}
 

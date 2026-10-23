@@ -26,19 +26,26 @@ type Group struct {
 	SID               SID `json:"SID"`
 }
 
-// AddGroup creates a new group
-func (g *Group) AddGroup(conf *config.ProviderConf) (string, error) {
-	log.Printf("[DEBUG] Adding group with name %q", g.Name)
-	cmds := []string{fmt.Sprintf("New-ADGroup -Passthru -Name %q -GroupScope %q -GroupCategory %q -Path %q", g.Name, g.Scope, g.Category, g.Container)}
+// newGroupCommand renders the New-ADGroup call for g, whose fields hold values
+// that SanitiseString has already escaped.
+func newGroupCommand(g *Group) string {
+	cmds := []string{fmt.Sprintf("New-ADGroup -Passthru -Name %s -GroupScope %s -GroupCategory %s -Path %s",
+		psQuoteSanitised(g.Name), psQuoteSanitised(g.Scope), psQuoteSanitised(g.Category), psQuoteSanitised(g.Container))}
 
 	if g.SAMAccountName != "" {
-		cmds = append(cmds, fmt.Sprintf("-SamAccountName %q", g.SAMAccountName))
+		cmds = append(cmds, fmt.Sprintf("-SamAccountName %s", psQuoteSanitised(g.SAMAccountName)))
 	}
 
 	if g.Description != "" {
-		cmds = append(cmds, fmt.Sprintf("-Description %q", g.Description))
+		cmds = append(cmds, fmt.Sprintf("-Description %s", psQuoteSanitised(g.Description)))
 	}
-	result, err := RunPSCommand(conf, "creating the group", strings.Join(cmds, " "), JSONOutput())
+	return strings.Join(cmds, " ")
+}
+
+// AddGroup creates a new group
+func (g *Group) AddGroup(conf *config.ProviderConf) (string, error) {
+	log.Printf("[DEBUG] Adding group with name %q", g.Name)
+	result, err := RunPSCommand(conf, "creating the group", newGroupCommand(g), JSONOutput())
 	if err != nil {
 		if ErrorMentions(err, "already exists") {
 			return "", fmt.Errorf("there is another group named %q", g.Name)
@@ -71,7 +78,7 @@ func (g *Group) ModifyGroup(d *schema.ResourceData, conf *config.ProviderConf) e
 			if value == "" {
 				value = "$null"
 			} else {
-				value = fmt.Sprintf(`"%s"`, value)
+				value = psQuoteSanitised(value)
 			}
 			cmds = append(cmds, fmt.Sprintf(`-%s %s`, param, value))
 		}
@@ -84,14 +91,14 @@ func (g *Group) ModifyGroup(d *schema.ResourceData, conf *config.ProviderConf) e
 	}
 
 	if d.HasChange("name") {
-		cmd := fmt.Sprintf("Rename-ADObject -Identity %q -NewName %q", g.GUID, d.Get("name").(string))
+		cmd := renameObjectCommand(g.GUID, d.Get("name").(string))
 		if _, err := RunPSCommand(conf, "renaming the group", cmd); err != nil {
 			return err
 		}
 	}
 
 	if d.HasChange("container") {
-		cmd := fmt.Sprintf("Move-ADObject -Identity %q -TargetPath %q", g.GUID, d.Get("container").(string))
+		cmd := moveObjectCommand(g.GUID, d.Get("container").(string))
 		if _, err := RunPSCommand(conf, "moving the group object", cmd); err != nil {
 			return err
 		}

@@ -36,7 +36,7 @@ func (g *GPLink) NewGPLink(conf *config.ProviderConf) (string, error) {
 		enabled = "Yes"
 	}
 
-	cmds := []string{fmt.Sprintf("New-GPLink -Guid %q -Target %q -LinkEnabled %q -Enforced %q", g.GPOGuid, g.Target, enabled, enforced)}
+	cmds := []string{fmt.Sprintf("New-GPLink -Guid %q -Target %s -LinkEnabled %q -Enforced %q", g.GPOGuid, psQuoteSanitised(g.Target), enabled, enforced)}
 
 	if g.Order > 0 {
 		cmds = append(cmds, fmt.Sprintf("-Order %d", g.Order))
@@ -54,7 +54,7 @@ func (g *GPLink) NewGPLink(conf *config.ProviderConf) (string, error) {
 		return "", fmt.Errorf("error while unmarshalling gplink json document: %s", err)
 	}
 
-	ou, err := NewOrgUnitFromHost(conf, gplink.Target, "", "")
+	ou, err := NewOrgUnitFromHost(conf, SanitiseString(gplink.Target), "", "")
 	if err != nil {
 		return "", fmt.Errorf("failed to retrieve details for OU %q: %s", gplink.Target, err)
 	}
@@ -67,7 +67,7 @@ func (g *GPLink) NewGPLink(conf *config.ProviderConf) (string, error) {
 
 // ModifyGPLink changes a GPO link
 func (g *GPLink) ModifyGPLink(conf *config.ProviderConf, changes map[string]any) error {
-	cmds := []string{fmt.Sprintf("Set-GPLink -guid %q -target %q", g.GPOGuid, g.Target)}
+	cmds := []string{fmt.Sprintf("Set-GPLink -guid %q -target %s", g.GPOGuid, psQuoteSanitised(g.Target))}
 	keyMap := map[string]string{
 		"enforced": "Enforced",
 		"enabled":  "LinkEnabled",
@@ -75,11 +75,11 @@ func (g *GPLink) ModifyGPLink(conf *config.ProviderConf, changes map[string]any)
 
 	for k, v := range changes {
 		if paramName, ok := keyMap[k]; ok {
-			value := "No"
+			yesNo := "No"
 			if v.(bool) {
-				value = "Yes"
+				yesNo = "Yes"
 			}
-			cmds = append(cmds, fmt.Sprintf("-%s %q", paramName, value))
+			cmds = append(cmds, fmt.Sprintf("-%s %q", paramName, yesNo))
 		}
 	}
 
@@ -99,7 +99,7 @@ func (g *GPLink) ModifyGPLink(conf *config.ProviderConf, changes map[string]any)
 
 // RemoveGPLink deletes a link between a GPO and an AD object
 func (g *GPLink) RemoveGPLink(conf *config.ProviderConf) error {
-	cmd := fmt.Sprintf("Remove-GPlink -Guid %q -Target %q", g.GPOGuid, g.Target)
+	cmd := fmt.Sprintf("Remove-GPlink -Guid %q -Target %s", g.GPOGuid, psQuoteSanitised(g.Target))
 	_, err := RunPSCommand(conf, "removing the GPO link", cmd, Domain())
 	return CheckDeleteResult(err, "GpoLinkNotFound", "GpoWithIdNotFound", "There is no such object on the server")
 }

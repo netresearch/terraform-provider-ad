@@ -72,17 +72,26 @@ func SanitiseTFInput(d *schema.ResourceData, key string) string {
 
 }
 
-// SanitiseString returns the value of a string after some basic sanitisation checks
-// to protect ourselves from command injection
+// SanitiseString escapes a value for the inside of a PowerShell double-quoted
+// string, to protect ourselves from command injection. The result still needs
+// the quotes around it: psQuoteSanitised adds them, psQuote does both steps.
+//
+// U+001F is not mapped. It used to become `e, which PowerShell 7 reads as ESC
+// (U+001B), a different character; the raw character inside the quotes reaches
+// the cmdlet unchanged.
 func SanitiseString(key string) string {
 	cleanupReplacer := strings.NewReplacer(
 		"`", "``",
 		`"`, "`\"",
+		// PowerShell also ends a double-quoted string on the typographic double
+		// quotes, so they are escaped like the ASCII one.
+		"\u201c", "`\u201c", // “
+		"\u201d", "`\u201d", // ”
+		"\u201e", "`\u201e", // „
 		"$", "`$",
 		"\x00", "`0",
 		"\x07", "`a",
 		"\x08", "`b",
-		"\x1f", "`e",
 		"\x0c", "`f",
 		"\n", "`n",
 		"\r", "`r",
@@ -102,7 +111,7 @@ func SanitiseString(key string) string {
 // SetMachineExtensionNames will add the necessary GUIDs to the GPO's gPCMachineExtensionNames attribute.
 // These are required for the security settings part of a GPO to work.
 func SetMachineExtensionNames(conf *config.ProviderConf, gpoDN, value string) error {
-	cmd := fmt.Sprintf(`Set-ADObject -Identity "%s" -Replace @{gPCMachineExtensionNames="%s"}`, gpoDN, value)
+	cmd := fmt.Sprintf("Set-ADObject -Identity %s -Replace @{gPCMachineExtensionNames=%s}", psQuote(gpoDN), psQuote(value))
 	if _, err := RunPSCommand(conf, fmt.Sprintf("setting machine extension names for GPO %q", gpoDN), cmd); err != nil {
 		return err
 	}
@@ -138,10 +147,49 @@ func CheckDeleteResult(err error, alreadyGone ...string) error {
 // Every hashtable this package builds goes through here, so the three call sites
 // cannot drift apart again — they had, and only one of them quoted its key.
 func PSHashtableEntry(key, value string) string {
-	// SanitiseString does not touch apostrophes, and an apostrophe would close
-	// the single-quoted literal early. PowerShell escapes one by doubling it.
-	escapedKey := strings.ReplaceAll(SanitiseString(key), "'", "''")
-	return fmt.Sprintf("'%s'=%s", escapedKey, value)
+	return fmt.Sprintf("'%s'=%s", psSingleQuoteEscaper.Replace(key), value)
+}
+
+// psSingleQuoteEscaper escapes a value for the inside of a PowerShell
+// single-quoted string. Inside single quotes a backtick and a $ are literal, so
+// the only escape is doubling a quote mark, and PowerShell reads the four
+// typographic single quotes as quote marks too. SanitiseString is for double
+// quotes and would put literal backticks into the value here.
+var psSingleQuoteEscaper = strings.NewReplacer(
+	"'", "''",
+	"\u2018", "\u2018\u2018", // ‘
+	"\u2019", "\u2019\u2019", // ’
+	"\u201a", "\u201a\u201a", // ‚
+	"\u201b", "\u201b\u201b", // ‛
+)
+
+// psQuoteSanitised puts a value that SanitiseString has already escaped into
+// PowerShell double quotes. The structs built from resource data hold such
+// values. Go's %q is not a substitute: it escapes the value a second time with
+// Go rules, which PowerShell does not read, so a `"` ends the string early and a
+// backslash reaches the directory doubled.
+func psQuoteSanitised(sanitised string) string {
+	return `"` + sanitised + `"`
+}
+
+// psQuote escapes a raw value and puts it into PowerShell double quotes, for
+// values that did not go through SanitiseString: d.Get results, change maps,
+// identities read back from the directory.
+func psQuote(raw string) string {
+	return psQuoteSanitised(SanitiseString(raw))
+}
+
+// renameObjectCommand renders the Rename-ADObject call that changes the name
+// (CN or OU) of the object with the given GUID. newName is the raw value.
+func renameObjectCommand(guid, newName string) string {
+	return fmt.Sprintf("Rename-ADObject -Identity %q -NewName %s", guid, psQuote(newName))
+}
+
+// moveObjectCommand renders the Move-ADObject call that moves the object with
+// the given GUID below targetPath, a raw distinguished name. A DN carries
+// backslash escapes such as `\,`, which %q would double.
+func moveObjectCommand(guid, targetPath string) string {
+	return fmt.Sprintf("Move-ADObject -Identity %q -TargetPath %s", guid, psQuote(targetPath))
 }
 
 // PSHashtableValue renders a value taken from a SortInnerSlice map for use in a
@@ -180,7 +228,7 @@ func GetString(v any) string {
 	case reflect.Bool:
 		out = strconv.FormatBool(v.(bool))
 	}
-	return fmt.Sprintf(`"%s"`, out)
+	return psQuoteSanitised(out)
 }
 
 // SortInnerSlice is used to sort multivalued custom attributes.
@@ -225,12 +273,12 @@ func UploadFiletoSYSVOL(conf *config.ProviderConf, cpClient *winrmcp.Winrmcp, bu
 	toks := strings.Split(destPath, `\`)
 	x := toks[:len(toks)-1]
 	destDir := strings.Join(x, `\`)
-	mdCmd := fmt.Sprintf(`$check=Test-Path "%s"; if (!$check)  {md "%s"}`, destDir, destDir)
+	mdCmd := fmt.Sprintf(`$check=Test-Path %s; if (!$check)  {md %s}`, psQuote(destDir), psQuote(destDir))
 	if _, err := RunPSCommand(conf, fmt.Sprintf("creating directory %q on SYSVOL", destDir), mdCmd, Domain()); err != nil {
 		return err
 	}
 
-	cpCmd := fmt.Sprintf(`Copy-Item "%s" "%s"; Remove-Item "%s"`, tmpPath, destPath, tmpPath)
+	cpCmd := fmt.Sprintf(`Copy-Item %s %s; Remove-Item %s`, psQuote(tmpPath), psQuote(destPath), psQuote(tmpPath))
 	if _, err := RunPSCommand(conf, fmt.Sprintf("copying the file to %q", destPath), cpCmd, Domain()); err != nil {
 		return err
 	}
