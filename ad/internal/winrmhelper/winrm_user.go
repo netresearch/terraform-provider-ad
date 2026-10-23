@@ -211,13 +211,7 @@ func (u *User) ModifyUser(d *schema.ResourceData, conf *config.ProviderConf) err
 
 	for k, param := range strKeyMap {
 		if d.HasChange(k) {
-			value := SanitiseTFInput(d, k)
-			if value == "" {
-				value = "$null"
-			} else {
-				value = psQuoteSanitised(value)
-			}
-			cmds = append(cmds, fmt.Sprintf(`-%s %s`, param, value))
+			cmds = append(cmds, parameterArgument(param, SanitiseTFInput(d, k)))
 		}
 	}
 

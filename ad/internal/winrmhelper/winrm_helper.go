@@ -203,6 +203,21 @@ func psQuote(raw string) string {
 	return psQuoteSanitised(SanitiseString(raw))
 }
 
+// clearableValue renders an already escaped value for a Set-* parameter: an
+// empty one clears the attribute with $null, any other is quoted once.
+func clearableValue(sanitised string) string {
+	if sanitised == "" {
+		return "$null"
+	}
+	return psQuoteSanitised(sanitised)
+}
+
+// parameterArgument renders "-name value" for a Set-* call, with the value
+// already escaped by SanitiseString.
+func parameterArgument(name, sanitised string) string {
+	return fmt.Sprintf("-%s %s", name, clearableValue(sanitised))
+}
+
 // renameObjectCommand renders the Rename-ADObject call that changes the name
 // (CN or OU) of the object with the given GUID. newName is the raw value.
 func renameObjectCommand(guid, newName string) string {

@@ -125,6 +125,20 @@ func TestRawValueBuildersEscape(t *testing.T) {
 	wantParams(t, userLookupCommand(hostileRaw), "identity")
 	wantParams(t, groupLookupCommand(hostileRaw), "identity")
 	wantParams(t, groupMembersLookupCommand(hostileRaw), "Identity")
+	wantParams(t, memberOpCommand("Remove-ADGroupMember", hostileRaw, `"m"`), "Identity")
+	wantParams(t, addMembersCommand(hostileRaw, `"m"`), "Identity")
+	if got := groupMembersPositionalLookup(hostileRaw); got != "Get-AdGroupMember "+hostileQuoted {
+		t.Errorf("the delete sub-command does not quote the group once: %s", got)
+	}
+	if got := removeAllMembersCommand(hostileRaw, "x"); !strings.HasPrefix(got, "Remove-ADGroupMember "+hostileQuoted+" ") {
+		t.Errorf("the delete command does not quote the group once: %s", got)
+	}
+	if got, want := parameterArgument("Description", sanitisedHostile()), "-Description "+hostileQuoted; got != want {
+		t.Errorf("parameterArgument\n got: %s\nwant: %s", got, want)
+	}
+	if got := parameterArgument("Description", ""); got != "-Description $null" {
+		t.Errorf("an empty value must clear the attribute with $null: %s", got)
+	}
 	if got, want := getMembershipList([]*GroupMember{{GUID: hostileRaw}, {GUID: upperGUID}}), hostileQuoted+`,"`+upperGUID+`"`; got != want {
 		t.Errorf("member list\n got: %s\nwant: %s", got, want)
 	}
@@ -273,9 +287,14 @@ func roundTripCases(t *testing.T) []psRoundTrip {
 		{"Set-ADUser -Clear", "Set-ADUser -Identity " + psQuote(upperGUID) + " " + clearAttributesArgument([]string{"ms-DS-X", hostileRaw}),
 			map[string]string{"Clear": "ms-DS-X|" + hostileRaw}},
 		{"Get-ADGroupMember", groupMembersLookupCommand(escapedDN), map[string]string{"Identity": escapedDN}},
-		{"Add-ADGroupMember", "Add-ADGroupMember -Identity " + psQuote(escapedDN) + " -Members " +
-			getMembershipList([]*GroupMember{{GUID: hostileRaw}, {GUID: escapedDN}}),
+		{"Add-ADGroupMember", addMembersCommand(escapedDN, getMembershipList([]*GroupMember{{GUID: hostileRaw}, {GUID: escapedDN}})),
 			map[string]string{"Identity": escapedDN, "Members": hostileRaw + "|" + escapedDN}},
+		{"Remove-ADGroupMember chunk", memberOpCommand("Remove-ADGroupMember", escapedDN, getMembershipList([]*GroupMember{{GUID: hostileRaw}, {GUID: escapedDN}})),
+			map[string]string{"Identity": escapedDN, "_0": hostileRaw + "|" + escapedDN}},
+		{"Get-AdGroupMember sub-command", groupMembersPositionalLookup(escapedDN), map[string]string{"_0": escapedDN}},
+		{"Remove-ADGroupMember all", removeAllMembersCommand(escapedDN, "Probe-Lookup"), map[string]string{"_0": escapedDN}},
+		{"Set-ADUser attributes", "Set-ADUser -Identity " + psQuote(upperGUID) + " " + parameterArgument("Description", h) + " " + parameterArgument("Title", ""),
+			map[string]string{"Description": hostileRaw, "Title": ""}},
 		{"Get-ADObject by name", mustLookup(t, "", h, h), all("Name", "Path")},
 		{"Set-ADOrganizationalUnit", setOrgUnitCommand(h, map[string]any{"description": hostileRaw, "display_name": hostileRaw}),
 			all("Identity", "Description", "DisplayName")},
@@ -339,6 +358,7 @@ function Record {
       }
       $i++
     } elseif (-not $tok.StartsWith('-')) {
+      if ($A[$i] -is [array]) { $tok = ($A[$i] | ForEach-Object { [string]$_ }) -join '|' }
       $values['_' + $pos] = $tok
       $pos++
     }
@@ -352,7 +372,8 @@ foreach ($c in 'New-ADUser','Set-ADAccountPassword','Rename-ADObject','Move-ADOb
                 'New-ADOrganizationalUnit','New-ADComputer','New-GPO','Get-GPO','Probe-Credential','Probe-Hashtable',
                 'Get-ADObject','Set-ADOrganizationalUnit','Get-ADComputer','Set-ADComputer','Rename-GPO','Remove-GPO',
                 'New-GPLink','Remove-GPlink','Set-GPLink','Get-Content','Remove-Item','Set-ADObject',
-                'Get-ADUser','Get-ADGroup','Get-ADGroupMember','Add-ADGroupMember','Set-ADUser') {
+                'Get-ADUser','Get-ADGroup','Get-ADGroupMember','Add-ADGroupMember','Set-ADUser',
+                'Remove-ADGroupMember','Get-AdGroupMember','Probe-Lookup') {
   Set-Item -Path ("function:global:" + $c) -Value ([scriptblock]::Create("Record '$c' ` + "`" + `$args"))
 }
 $out = @()
@@ -498,14 +519,14 @@ func formatViolations(fset *token.FileSet, call *ast.CallExpr, format string) []
 
 // parameterValuePosition matches format text that ends where PowerShell
 // expects a value: after a parameter name or an assignment.
-var parameterValuePosition = regexp.MustCompile(`(-[A-Za-z]+|=) $`)
+var parameterValuePosition = regexp.MustCompile(`(-[A-Za-z]+|-%s|=) $`)
 
 // quotedArgument reports whether arg is safe in a value position: a call to
 // one of the quoting helpers, a GUID, or one of the values in
 // preformattedValues.
 func quotedArgument(arg ast.Expr, text string) bool {
 	if call, ok := arg.(*ast.CallExpr); ok {
-		if id, ok := call.Fun.(*ast.Ident); ok && (id.Name == "psQuote" || id.Name == "psQuoteSanitised") {
+		if id, ok := call.Fun.(*ast.Ident); ok && (id.Name == "psQuote" || id.Name == "psQuoteSanitised" || id.Name == "clearableValue") {
 			return true
 		}
 	}
@@ -517,7 +538,6 @@ func quotedArgument(arg ast.Expr, text string) bool {
 // holds no quote, $, backtick or space.
 var preformattedValues = map[string]bool{
 	"opts.Server": true, // -Server / -Computername: the domain controller host name
-	"value":       true, // Set-ADComputer -Description: $null or psQuote(...)
 	"memberList":  true, // getMembershipList, every member through psQuote
 	"attrs":       true, // getOtherAttributes, a hashtable built from PSHashtableEntry
 }

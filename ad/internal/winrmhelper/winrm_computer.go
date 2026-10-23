@@ -134,11 +134,7 @@ func (m *Computer) Update(conf *config.ProviderConf, changes map[string]any) err
 // setComputerDescriptionCommand renders the Set-ADComputer call for a raw
 // description. An empty one clears the attribute with $null.
 func setComputerDescriptionCommand(guid, description string) string {
-	value := "$null"
-	if description != "" {
-		value = psQuote(description)
-	}
-	return fmt.Sprintf("Set-ADComputer -Identity %q -Description %s", guid, value)
+	return fmt.Sprintf("Set-ADComputer -Identity %q %s", guid, parameterArgument("Description", SanitiseString(description)))
 }
 
 // Delete deletes an existing Computer objects from the AD tree

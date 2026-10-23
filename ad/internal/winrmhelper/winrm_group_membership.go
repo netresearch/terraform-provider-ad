@@ -12,7 +12,7 @@ import (
 )
 
 type GroupMembership struct {
-	GroupGUID    string
+	GroupID      string
 	GroupMembers []*GroupMember
 }
 
@@ -132,6 +132,30 @@ func groupMembersLookupCommand(groupID string) string {
 	return fmt.Sprintf("Get-ADGroupMember -Identity %s", psQuote(groupID))
 }
 
+// memberOpCommand renders an Add- or Remove-ADGroupMember call for one chunk.
+// groupID is raw; memberList comes from getMembershipList.
+func memberOpCommand(operation, groupID, memberList string) string {
+	return fmt.Sprintf("%s -Identity %s %s -Confirm:$false", operation, psQuote(groupID), memberList)
+}
+
+// addMembersCommand renders the Add-ADGroupMember call that creates a
+// membership. groupID is raw; memberList comes from getMembershipList.
+func addMembersCommand(groupID, memberList string) string {
+	return fmt.Sprintf("Add-ADGroupMember -Identity %s -Members %s", psQuote(groupID), memberList)
+}
+
+// groupMembersPositionalLookup renders the Get-AdGroupMember sub-command the
+// delete pipeline feeds into -Members. groupID is raw.
+func groupMembersPositionalLookup(groupID string) string {
+	return fmt.Sprintf("Get-AdGroupMember %s", psQuote(groupID))
+}
+
+// removeAllMembersCommand renders the Remove-ADGroupMember call that empties
+// the group; lookup is the rendered groupMembersPositionalLookup.
+func removeAllMembersCommand(groupID, lookup string) string {
+	return fmt.Sprintf("Remove-ADGroupMember %s -Members (%s) -Confirm:$false", psQuote(groupID), lookup)
+}
+
 // getMembershipList renders the members for -Members. Each identifier is a raw
 // value from group_members or from the directory.
 func getMembershipList(g []*GroupMember) string {
@@ -148,7 +172,7 @@ func getMembershipList(g []*GroupMember) string {
 }
 
 func (g *GroupMembership) getGroupMembers(conf *config.ProviderConf) ([]*GroupMember, error) {
-	cmd := groupMembersLookupCommand(g.GroupGUID)
+	cmd := groupMembersLookupCommand(g.GroupID)
 	result, err := RunPSCommand(conf, "running Get-ADGroupMember", cmd, JSONOutput(), ForceArray())
 	if err != nil {
 		return nil, err
@@ -216,7 +240,7 @@ func (g *GroupMembership) bulkGroupMembersOp(conf *config.ProviderConf, operatio
 
 	for _, chunk := range chunkMembers(members, maxMemberListLength) {
 		memberList := getMembershipList(chunk)
-		cmd := fmt.Sprintf("%s -Identity %s %s -Confirm:$false", operation, psQuote(g.GroupGUID), memberList)
+		cmd := memberOpCommand(operation, g.GroupID, memberList)
 
 		if _, err := RunPSCommand(conf, fmt.Sprintf("running %s", operation), cmd); err != nil {
 			return err
@@ -260,8 +284,7 @@ func (g *GroupMembership) Create(conf *config.ProviderConf) error {
 	}
 
 	memberList := getMembershipList(g.GroupMembers)
-	cmds := []string{fmt.Sprintf("Add-ADGroupMember -Identity %s -Members %s", psQuote(g.GroupGUID), memberList)}
-	if _, err := RunPSCommand(conf, "running Add-ADGroupMember", strings.Join(cmds, " ")); err != nil {
+	if _, err := RunPSCommand(conf, "running Add-ADGroupMember", addMembersCommand(g.GroupID, memberList)); err != nil {
 		return err
 	}
 
@@ -270,8 +293,8 @@ func (g *GroupMembership) Create(conf *config.ProviderConf) error {
 
 func (g *GroupMembership) Delete(conf *config.ProviderConf) error {
 	subCmdOpt := NewPSCommandOpts(conf, SkipCredentialPreamble())
-	subcmd := NewPSCommand([]string{fmt.Sprintf("Get-AdGroupMember %s", psQuote(g.GroupGUID))}, subCmdOpt)
-	cmd := fmt.Sprintf("Remove-ADGroupMember %s -Members (%s) -Confirm:$false", psQuote(g.GroupGUID), subcmd.String())
+	subcmd := NewPSCommand([]string{groupMembersPositionalLookup(g.GroupID)}, subCmdOpt)
+	cmd := removeAllMembersCommand(g.GroupID, subcmd.String())
 
 	// A group that has no members left makes Remove-ADGroupMember reject its
 	// empty -Members list, which for a destroy is the state we wanted.
@@ -281,7 +304,7 @@ func (g *GroupMembership) Delete(conf *config.ProviderConf) error {
 
 func NewGroupMembershipFromHost(conf *config.ProviderConf, groupID string) (*GroupMembership, error) {
 	result := &GroupMembership{
-		GroupGUID: groupID,
+		GroupID: groupID,
 	}
 
 	gm, err := result.getGroupMembers(conf)
@@ -297,7 +320,7 @@ func NewGroupMembershipFromState(d *schema.ResourceData) (*GroupMembership, erro
 	groupID := d.Get("group_id").(string)
 	members := d.Get("group_members").(*schema.Set)
 	result := &GroupMembership{
-		GroupGUID:    groupID,
+		GroupID:      groupID,
 		GroupMembers: []*GroupMember{},
 	}
 

@@ -88,7 +88,7 @@ func resourceADGroupMembershipCreate(d *schema.ResourceData, meta any) error {
 		return err
 	}
 
-	d.SetId(membershipID(gm.GroupGUID))
+	d.SetId(membershipID(gm.GroupID))
 
 	return nil
 }

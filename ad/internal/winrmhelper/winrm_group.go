@@ -74,13 +74,7 @@ func (g *Group) ModifyGroup(d *schema.ResourceData, conf *config.ProviderConf) e
 
 	for k, param := range KeyMap {
 		if d.HasChange(k) {
-			value := SanitiseTFInput(d, k)
-			if value == "" {
-				value = "$null"
-			} else {
-				value = psQuoteSanitised(value)
-			}
-			cmds = append(cmds, fmt.Sprintf(`-%s %s`, param, value))
+			cmds = append(cmds, parameterArgument(param, SanitiseTFInput(d, k)))
 		}
 	}
 
