@@ -67,7 +67,7 @@ func resourceADComputerRead(d *schema.ResourceData, meta any) error {
 		return nil
 	}
 
-	computer, err := winrmhelper.NewComputerFromHost(meta.(*config.ProviderConf), d.Id())
+	computer, err := winrmhelper.NewComputerFromHost(meta.(*config.ProviderConf), winrmhelper.SanitiseString(d.Id()))
 	if err != nil {
 		if winrmhelper.ErrorMentions(err, "ObjectNotFound") {
 			// Resource no longer exists
