@@ -23,9 +23,9 @@ type GPLink struct {
 	Enabled  bool   `json:"Enabled"`
 }
 
-// NewGPLink creates a link between a GPO and an AD object
-func (g *GPLink) NewGPLink(conf *config.ProviderConf) (string, error) {
-	log.Printf("[DEBUG] Creating new user")
+// newGPLinkCommand renders the New-GPLink call for g, whose target has already
+// been through SanitiseString.
+func newGPLinkCommand(g *GPLink) string {
 	enforced := "No"
 	if g.Enforced {
 		enforced = "Yes"
@@ -41,7 +41,13 @@ func (g *GPLink) NewGPLink(conf *config.ProviderConf) (string, error) {
 	if g.Order > 0 {
 		cmds = append(cmds, fmt.Sprintf("-Order %d", g.Order))
 	}
-	result, err := RunPSCommand(conf, "running New-GPLink", strings.Join(cmds, " "), Domain(), JSONOutput())
+	return strings.Join(cmds, " ")
+}
+
+// NewGPLink creates a link between a GPO and an AD object
+func (g *GPLink) NewGPLink(conf *config.ProviderConf) (string, error) {
+	log.Printf("[DEBUG] Creating new user")
+	result, err := RunPSCommand(conf, "running New-GPLink", newGPLinkCommand(g), Domain(), JSONOutput())
 	if err != nil {
 		if ErrorMentions(err, "is already linked") {
 			return "", fmt.Errorf("there is another link between GPO %q and target %q", g.GPOGuid, g.Target)
@@ -65,8 +71,10 @@ func (g *GPLink) NewGPLink(conf *config.ProviderConf) (string, error) {
 
 }
 
-// ModifyGPLink changes a GPO link
-func (g *GPLink) ModifyGPLink(conf *config.ProviderConf, changes map[string]any) error {
+// setGPLinkCommand renders the Set-GPLink call for the enforced, enabled and
+// order entries of changes. g.Target has already been through SanitiseString.
+// ok is false when changes holds none of them.
+func setGPLinkCommand(g *GPLink, changes map[string]any) (cmd string, ok bool) {
 	cmds := []string{fmt.Sprintf("Set-GPLink -guid %q -target %s", g.GPOGuid, psQuoteSanitised(g.Target))}
 	keyMap := map[string]string{
 		"enforced": "Enforced",
@@ -88,18 +96,33 @@ func (g *GPLink) ModifyGPLink(conf *config.ProviderConf, changes map[string]any)
 	}
 
 	if len(cmds) == 1 {
+		return "", false
+	}
+	return strings.Join(cmds, " "), true
+}
+
+// ModifyGPLink changes a GPO link
+func (g *GPLink) ModifyGPLink(conf *config.ProviderConf, changes map[string]any) error {
+	cmd, ok := setGPLinkCommand(g, changes)
+	if !ok {
 		return nil
 	}
-	if _, err := RunPSCommand(conf, "running Set-GPLink", strings.Join(cmds, " "), Domain()); err != nil {
+	if _, err := RunPSCommand(conf, "running Set-GPLink", cmd, Domain()); err != nil {
 		return err
 	}
 
 	return nil
 }
 
+// removeGPLinkCommand renders the Remove-GPLink call for g, whose target has
+// already been through SanitiseString.
+func removeGPLinkCommand(g *GPLink) string {
+	return fmt.Sprintf("Remove-GPlink -Guid %q -Target %s", g.GPOGuid, psQuoteSanitised(g.Target))
+}
+
 // RemoveGPLink deletes a link between a GPO and an AD object
 func (g *GPLink) RemoveGPLink(conf *config.ProviderConf) error {
-	cmd := fmt.Sprintf("Remove-GPlink -Guid %q -Target %s", g.GPOGuid, psQuoteSanitised(g.Target))
+	cmd := removeGPLinkCommand(g)
 	_, err := RunPSCommand(conf, "removing the GPO link", cmd, Domain())
 	return CheckDeleteResult(err, "GpoLinkNotFound", "GpoWithIdNotFound", "There is no such object on the server")
 }

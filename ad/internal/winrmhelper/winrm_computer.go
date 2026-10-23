@@ -34,10 +34,16 @@ func NewComputerFromResource(d *schema.ResourceData) *Computer {
 	}
 }
 
+// computerLookupCommand renders the Get-ADComputer call for an identity that
+// has already been through SanitiseString.
+func computerLookupCommand(identity string) string {
+	return fmt.Sprintf("Get-ADComputer -Identity %s -Properties *", psQuoteSanitised(identity))
+}
+
 // NewComputerFromHost return a new Machine struct populated from data we get
 // from the domain controller. identity has already been through SanitiseString.
 func NewComputerFromHost(conf *config.ProviderConf, identity string) (*Computer, error) {
-	cmd := fmt.Sprintf("Get-ADComputer -Identity %s -Properties *", psQuoteSanitised(identity))
+	cmd := computerLookupCommand(identity)
 	conn, err := conf.AcquireWinRMClient()
 	if err != nil {
 		return nil, fmt.Errorf("while acquiring winrm client: %s", err)
@@ -111,12 +117,7 @@ func (m *Computer) Update(conf *config.ProviderConf, changes map[string]any) err
 	}
 
 	if description, ok := changes["description"]; ok {
-		if description == "" {
-			description = "$null"
-		} else {
-			description = psQuote(description.(string))
-		}
-		cmd := fmt.Sprintf("Set-ADComputer -Identity %q -Description %s", m.GUID, description)
+		cmd := setComputerDescriptionCommand(m.GUID, description.(string))
 		conn, err := conf.AcquireWinRMClient()
 		if err != nil {
 			return fmt.Errorf("while acquiring winrm client: %s", err)
@@ -128,6 +129,16 @@ func (m *Computer) Update(conf *config.ProviderConf, changes map[string]any) err
 	}
 
 	return nil
+}
+
+// setComputerDescriptionCommand renders the Set-ADComputer call for a raw
+// description. An empty one clears the attribute with $null.
+func setComputerDescriptionCommand(guid, description string) string {
+	value := "$null"
+	if description != "" {
+		value = psQuote(description)
+	}
+	return fmt.Sprintf("Set-ADComputer -Identity %q -Description %s", guid, value)
 }
 
 // Delete deletes an existing Computer objects from the AD tree

@@ -108,10 +108,34 @@ func SanitiseString(key string) string {
 	return cleanupReplacer.Replace(key)
 }
 
+// machineExtensionNamesCommand renders the Set-ADObject call for a raw GPO DN
+// and a raw extension-names value.
+func machineExtensionNamesCommand(gpoDN, value string) string {
+	return fmt.Sprintf("Set-ADObject -Identity %s -Replace @{gPCMachineExtensionNames=%s}", psQuote(gpoDN), psQuote(value))
+}
+
+// getContentCommand renders the Get-Content call for a raw path.
+func getContentCommand(path string) string {
+	return fmt.Sprintf("Get-Content %s", psQuote(path))
+}
+
+// removeItemCommand renders the Remove-Item call for a raw path.
+func removeItemCommand(path string) string {
+	return fmt.Sprintf("Remove-Item %s", psQuote(path))
+}
+
+// sysvolCopyCommands renders the two commands that create destDir if needed
+// and move the uploaded file from tmpPath to destPath. All three are raw paths.
+func sysvolCopyCommands(tmpPath, destPath, destDir string) (mkdir, copyAndRemove string) {
+	mkdir = fmt.Sprintf(`$check=Test-Path %s; if (!$check)  {md %s}`, psQuote(destDir), psQuote(destDir))
+	copyAndRemove = fmt.Sprintf(`Copy-Item %s %s; Remove-Item %s`, psQuote(tmpPath), psQuote(destPath), psQuote(tmpPath))
+	return mkdir, copyAndRemove
+}
+
 // SetMachineExtensionNames will add the necessary GUIDs to the GPO's gPCMachineExtensionNames attribute.
 // These are required for the security settings part of a GPO to work.
 func SetMachineExtensionNames(conf *config.ProviderConf, gpoDN, value string) error {
-	cmd := fmt.Sprintf("Set-ADObject -Identity %s -Replace @{gPCMachineExtensionNames=%s}", psQuote(gpoDN), psQuote(value))
+	cmd := machineExtensionNamesCommand(gpoDN, value)
 	if _, err := RunPSCommand(conf, fmt.Sprintf("setting machine extension names for GPO %q", gpoDN), cmd); err != nil {
 		return err
 	}
@@ -273,12 +297,11 @@ func UploadFiletoSYSVOL(conf *config.ProviderConf, cpClient *winrmcp.Winrmcp, bu
 	toks := strings.Split(destPath, `\`)
 	x := toks[:len(toks)-1]
 	destDir := strings.Join(x, `\`)
-	mdCmd := fmt.Sprintf(`$check=Test-Path %s; if (!$check)  {md %s}`, psQuote(destDir), psQuote(destDir))
+	mdCmd, cpCmd := sysvolCopyCommands(tmpPath, destPath, destDir)
 	if _, err := RunPSCommand(conf, fmt.Sprintf("creating directory %q on SYSVOL", destDir), mdCmd, Domain()); err != nil {
 		return err
 	}
 
-	cpCmd := fmt.Sprintf(`Copy-Item %s %s; Remove-Item %s`, psQuote(tmpPath), psQuote(destPath), psQuote(tmpPath))
 	if _, err := RunPSCommand(conf, fmt.Sprintf("copying the file to %q", destPath), cpCmd, Domain()); err != nil {
 		return err
 	}

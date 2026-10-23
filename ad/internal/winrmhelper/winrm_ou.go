@@ -35,16 +35,25 @@ func NewOrgUnitFromResource(d *schema.ResourceData) *OrgUnit {
 	return &ou
 }
 
+// orgUnitLookupCommand renders the Get-ADObject call that finds an OU by
+// identity (a GUID or a DN), or by name and path. All three have already been
+// through SanitiseString. ok is false when neither form is complete.
+func orgUnitLookupCommand(identity, name, path string) (cmd string, ok bool) {
+	if identity != "" {
+		return fmt.Sprintf("Get-ADObject -Properties * -Identity %s", psQuoteSanitised(identity)), true
+	}
+	if name != "" && path != "" {
+		return fmt.Sprintf("Get-ADObject -Properties * -Name %s -Path %s", psQuoteSanitised(name), psQuoteSanitised(path)), true
+	}
+	return "", false
+}
+
 // NewOrgUnitFromHost returns a new OrgUnit struct populated from data we get from
 // the domain controller. guid (a GUID or a DN), name and path have already been
 // through SanitiseString.
 func NewOrgUnitFromHost(conf *config.ProviderConf, guid, name, path string) (*OrgUnit, error) {
-	var cmd string
-	if guid != "" {
-		cmd = fmt.Sprintf("Get-ADObject -Properties * -Identity %s", psQuoteSanitised(guid))
-	} else if name != "" && path != "" {
-		cmd = fmt.Sprintf("Get-ADObject -Properties * -Name %s -Path %s", psQuoteSanitised(name), psQuoteSanitised(path))
-	} else {
+	cmd, ok := orgUnitLookupCommand(guid, name, path)
+	if !ok {
 		return nil, fmt.Errorf("invalid inputs, dn or a combination of path and name are required")
 	}
 	result, err := RunPSCommand(conf, "retrieving the OU", cmd, JSONOutput())
@@ -94,12 +103,11 @@ func (o *OrgUnit) Create(conf *config.ProviderConf) (string, error) {
 	return ou.GUID, nil
 }
 
-// Update updates an existing OU in the AD tree
-func (o *OrgUnit) Update(conf *config.ProviderConf, changes map[string]any) error {
-	if o.DistinguishedName == "" {
-		return fmt.Errorf("Cannot update OU with name %q, distiguished name is empty", o.Name)
-	}
-	cmd := fmt.Sprintf("Set-ADOrganizationalUnit -Identity %s", psQuoteSanitised(o.DistinguishedName))
+// setOrgUnitCommand renders the Set-ADOrganizationalUnit call for the
+// display_name and description entries of changes, which are raw values. dn
+// has already been through SanitiseString.
+func setOrgUnitCommand(dn string, changes map[string]any) string {
+	cmd := fmt.Sprintf("Set-ADOrganizationalUnit -Identity %s", psQuoteSanitised(dn))
 
 	keyMap := map[string]string{
 		"display_name": "DisplayName",
@@ -111,6 +119,15 @@ func (o *OrgUnit) Update(conf *config.ProviderConf, changes map[string]any) erro
 			cmd = fmt.Sprintf("%s -%s %s", cmd, paramName, psQuote(v.(string)))
 		}
 	}
+	return cmd
+}
+
+// Update updates an existing OU in the AD tree
+func (o *OrgUnit) Update(conf *config.ProviderConf, changes map[string]any) error {
+	if o.DistinguishedName == "" {
+		return fmt.Errorf("Cannot update OU with name %q, distiguished name is empty", o.Name)
+	}
+	cmd := setOrgUnitCommand(o.DistinguishedName, changes)
 
 	if cmd != "Set-ADOrganizationalUnit -Identity" {
 		if _, err := RunPSCommand(conf, "modifying the OU", cmd); err != nil {
@@ -157,6 +174,12 @@ func (o *OrgUnit) Update(conf *config.ProviderConf, changes map[string]any) erro
 	return nil
 }
 
+// orgUnitLookupCommandByDN is the lookup the delete pipeline starts from.
+func orgUnitLookupCommandByDN(dn string) string {
+	cmd, _ := orgUnitLookupCommand(dn, "", "")
+	return cmd
+}
+
 // Delete deletes an existing OU from an AD tree
 func (o *OrgUnit) Delete(conf *config.ProviderConf) error {
 	if o.DistinguishedName == "" {
@@ -164,7 +187,7 @@ func (o *OrgUnit) Delete(conf *config.ProviderConf) error {
 	}
 	var cmds []string
 	subCmds := []string{
-		fmt.Sprintf("Get-ADObject -Properties * -Identity %s", psQuoteSanitised(o.DistinguishedName)),
+		orgUnitLookupCommandByDN(o.DistinguishedName),
 		"Set-ADObject -ProtectedFromAccidentalDeletion:$false -Passthru",
 		"Remove-ADOrganizationalUnit -confirm:$false",
 	}

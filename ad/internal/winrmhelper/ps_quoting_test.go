@@ -18,12 +18,12 @@ import (
 // character class that broke a command before: an ASCII double quote, a
 // backslash (doubled by %q, and part of every escaped DN), a subexpression,
 // the typographic double quotes, and a backtick.
-const hostileRaw = "x\"y\\z$(w)“q”`end"
+const hostileRaw = "x\"y\\z$(w)\u201cq\u201d`end"
 
 // hostileQuoted is hostileRaw as a PowerShell double-quoted literal, written
 // out by hand so that the tests do not compare psQuote with itself. The
 // parser test further down checks that PowerShell reads it back as hostileRaw.
-const hostileQuoted = "\"x`\"y\\z`$(w)`“q`”``end\""
+const hostileQuoted = "\"x`\"y\\z`$(w)`\u201cq`\u201d``end\""
 
 func TestPSQuote(t *testing.T) {
 	if got := psQuote(hostileRaw); got != hostileQuoted {
@@ -131,6 +131,70 @@ func TestRawValueBuildersEscape(t *testing.T) {
 	}
 }
 
+// The update, lookup and file builders, which the create tests above do not
+// reach. Builders that take sanitised values get h, the others the raw value.
+func TestUpdateAndLookupBuildersQuoteOnce(t *testing.T) {
+	h := sanitisedHostile()
+
+	cmd, ok := orgUnitLookupCommand(h, "", "")
+	if !ok {
+		t.Fatal("lookup by identity reported incomplete input")
+	}
+	wantParams(t, cmd, "Identity")
+	cmd, ok = orgUnitLookupCommand("", h, h)
+	if !ok {
+		t.Fatal("lookup by name and path reported incomplete input")
+	}
+	wantParams(t, cmd, "Name", "Path")
+	if _, ok := orgUnitLookupCommand("", h, ""); ok {
+		t.Error("lookup by name without a path must report incomplete input")
+	}
+	wantParams(t, orgUnitLookupCommandByDN(h), "Identity")
+	wantParams(t, setOrgUnitCommand(h, map[string]any{"description": hostileRaw, "display_name": hostileRaw, "path": "ignored"}),
+		"Identity", "Description", "DisplayName")
+
+	wantParams(t, computerLookupCommand(h), "Identity")
+	wantParams(t, setComputerDescriptionCommand(upperGUID, hostileRaw), "Description")
+	if got := setComputerDescriptionCommand(upperGUID, ""); !strings.HasSuffix(got, " -Description $null") {
+		t.Errorf("an empty description must clear the attribute with $null: %s", got)
+	}
+
+	wantParams(t, renameGPOCommand(&GPO{ID: upperGUID, Domain: h}, h), "TargetName", "Domain")
+	wantParams(t, removeGPOCommand(&GPO{Name: h, Domain: h}), "Name", "Domain")
+	if got := gpoStatusCommand(upperGUID, h); !strings.HasSuffix(got, ".GpoStatus = "+hostileQuoted) {
+		t.Errorf("the GPO status is not quoted once: %s", got)
+	}
+
+	link := &GPLink{GPOGuid: upperGUID, Target: h, Enabled: true}
+	wantParams(t, newGPLinkCommand(link), "Target")
+	wantParams(t, removeGPLinkCommand(link), "Target")
+	cmd, ok = setGPLinkCommand(link, map[string]any{"enforced": true})
+	if !ok {
+		t.Fatal("a change of enforced produced no Set-GPLink call")
+	}
+	wantParams(t, strings.Replace(cmd, "-target", "-Target", 1), "Target")
+	if _, ok := setGPLinkCommand(link, map[string]any{"target_dn": "x"}); ok {
+		t.Error("a change Set-GPLink cannot apply must produce no call")
+	}
+
+	for name, got := range map[string]string{"Get-Content": getContentCommand(hostileRaw), "Remove-Item": removeItemCommand(hostileRaw)} {
+		if !strings.HasSuffix(got, " "+hostileQuoted) {
+			t.Errorf("%s does not quote the path once: %s", name, got)
+		}
+	}
+	mkdir, copyAndRemove := sysvolCopyCommands(hostileRaw, hostileRaw, hostileRaw)
+	if n := strings.Count(mkdir, hostileQuoted); n != 2 {
+		t.Errorf("the mkdir command quotes the directory %d times, want 2: %s", n, mkdir)
+	}
+	if n := strings.Count(copyAndRemove, hostileQuoted); n != 3 {
+		t.Errorf("the copy command quotes its paths %d times, want 3: %s", n, copyAndRemove)
+	}
+	wantParams(t, machineExtensionNamesCommand(hostileRaw, hostileRaw), "Identity")
+	if got := machineExtensionNamesCommand(hostileRaw, hostileRaw); !strings.Contains(got, "gPCMachineExtensionNames="+hostileQuoted+"}") {
+		t.Errorf("the extension names are not quoted once: %s", got)
+	}
+}
+
 func TestResetPasswordCommandQuotesOnce(t *testing.T) {
 	cmd := resetPasswordCommand(upperGUID, sanitisedHostile())
 	if needle := "-AsPlainText " + hostileQuoted + " -Force"; !strings.Contains(cmd, needle) {
@@ -190,9 +254,42 @@ func roundTripCases(t *testing.T) []psRoundTrip {
 		{"New-GPO", newGPOCommand(&GPO{Name: h, Domain: h, Description: h}), all("Name", "Domain", "Comment")},
 		{"Get-GPO", getGPOCmdByName(h), all("Name")},
 		{"credentials", user + password + "Probe-Credential -User $User -Password $Password", all("User", "Password")},
-		{"hashtable key", "Probe-Hashtable -Table @{" + PSHashtableEntry("a$b'c’d", GetString(hostileRaw)) + "}",
-			map[string]string{"Table.key": "a$b'c’d", "Table.value": hostileRaw}},
+		{"hashtable key", "Probe-Hashtable -Table @{" + PSHashtableEntry("a$b'c\u2019d", GetString(hostileRaw)) + "}",
+			map[string]string{"Table.key": "a$b'c\u2019d", "Table.value": hostileRaw}},
+		{"Get-ADObject by identity", orgUnitLookupCommandByDN(h), map[string]string{"Identity": hostileRaw}},
+		{"Get-ADObject by name", mustLookup(t, "", h, h), all("Name", "Path")},
+		{"Set-ADOrganizationalUnit", setOrgUnitCommand(h, map[string]any{"description": hostileRaw, "display_name": hostileRaw}),
+			all("Identity", "Description", "DisplayName")},
+		{"Get-ADComputer", computerLookupCommand(h), all("Identity")},
+		{"Set-ADComputer", setComputerDescriptionCommand(upperGUID, hostileRaw), all("Description")},
+		{"Rename-GPO", renameGPOCommand(&GPO{ID: upperGUID, Domain: h}, h), all("TargetName", "Domain")},
+		{"Remove-GPO", removeGPOCommand(&GPO{Name: h, Domain: h}), all("Name", "Domain")},
+		{"New-GPLink", newGPLinkCommand(&GPLink{GPOGuid: upperGUID, Target: h}), all("Target")},
+		{"Remove-GPlink", removeGPLinkCommand(&GPLink{GPOGuid: upperGUID, Target: h}), all("Target")},
+		{"Set-GPLink", mustSetGPLink(t, &GPLink{GPOGuid: upperGUID, Target: h}), all("target")},
+		{"Get-Content", getContentCommand(hostileRaw), all("_0")},
+		{"Remove-Item", removeItemCommand(hostileRaw), all("_0")},
+		{"Set-ADObject", machineExtensionNamesCommand(hostileRaw, hostileRaw),
+			map[string]string{"Identity": hostileRaw, "Replace.key": "gPCMachineExtensionNames", "Replace.value": hostileRaw}},
 	}
+}
+
+func mustLookup(t *testing.T, identity, name, path string) string {
+	t.Helper()
+	cmd, ok := orgUnitLookupCommand(identity, name, path)
+	if !ok {
+		t.Fatal("orgUnitLookupCommand reported incomplete input")
+	}
+	return cmd
+}
+
+func mustSetGPLink(t *testing.T, g *GPLink) string {
+	t.Helper()
+	cmd, ok := setGPLinkCommand(g, map[string]any{"enabled": true})
+	if !ok {
+		t.Fatal("setGPLinkCommand produced no call")
+	}
+	return cmd
 }
 
 // psProbeScript replaces every cmdlet the cases call with a stub that records
@@ -204,6 +301,7 @@ $ErrorActionPreference = 'Stop'
 function Record {
   param([string]$Cmdlet, [object[]]$A)
   $values = @{}
+  $pos = 0
   for ($i = 0; $i -lt $A.Count; $i++) {
     $tok = [string]$A[$i]
     if ($tok.StartsWith('-') -and $i + 1 -lt $A.Count) {
@@ -219,17 +317,24 @@ function Record {
         $values[$name] = [string]$v
       }
       $i++
+    } elseif (-not $tok.StartsWith('-')) {
+      $values['_' + $pos] = $tok
+      $pos++
     }
   }
   $script:got = $values
 }
+# Read the cases before the stubs replace Get-Content.
+$cases = Get-Content -Raw -LiteralPath $args[0] | ConvertFrom-Json
 function ConvertTo-SecureString { foreach ($a in $args) { if (-not ([string]$a).StartsWith('-')) { return [string]$a } } }
 foreach ($c in 'New-ADUser','Set-ADAccountPassword','Rename-ADObject','Move-ADObject','New-ADGroup',
-                'New-ADOrganizationalUnit','New-ADComputer','New-GPO','Get-GPO','Probe-Credential','Probe-Hashtable') {
+                'New-ADOrganizationalUnit','New-ADComputer','New-GPO','Get-GPO','Probe-Credential','Probe-Hashtable',
+                'Get-ADObject','Set-ADOrganizationalUnit','Get-ADComputer','Set-ADComputer','Rename-GPO','Remove-GPO',
+                'New-GPLink','Remove-GPlink','Set-GPLink','Get-Content','Remove-Item','Set-ADObject') {
   Set-Item -Path ("function:global:" + $c) -Value ([scriptblock]::Create("Record '$c' ` + "`" + `$args"))
 }
 $out = @()
-foreach ($case in (Get-Content -Raw -LiteralPath $args[0] | ConvertFrom-Json)) {
+foreach ($case in $cases) {
   $script:got = $null
   try { Invoke-Expression $case.command; $err = '' } catch { $err = $_.Exception.Message }
   $out += @{ name = $case.name; got = $script:got; error = $err }

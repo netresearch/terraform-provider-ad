@@ -122,27 +122,37 @@ func GetGPOFromResource(d *schema.ResourceData) *GPO {
 	return &g
 }
 
+// renameGPOCommand renders the Rename-GPO call. target and g.Domain have
+// already been through SanitiseString.
+func renameGPOCommand(g *GPO, target string) string {
+	cmds := []string{fmt.Sprintf("Rename-GPO -Guid %s -TargetName %s", g.ID, psQuoteSanitised(target))}
+
+	if g.Domain != "" {
+		cmds = append(cmds, fmt.Sprintf("-Domain %s", psQuoteSanitised(g.Domain)))
+	}
+	return strings.Join(cmds, " ")
+}
+
 // Rename renames a GPO to the given name
 func (g *GPO) Rename(conf *config.ProviderConf, target string) error {
 	if g.ID == "" {
 		return fmt.Errorf("gpo guid required")
 	}
-	cmds := []string{}
-	cmds = append(cmds, fmt.Sprintf("Rename-GPO -Guid %s -TargetName %s", g.ID, psQuoteSanitised(target)))
-
-	if g.Domain != "" {
-		cmds = append(cmds, fmt.Sprintf("-Domain %s", psQuoteSanitised(g.Domain)))
-	}
-
-	if _, err := RunPSCommand(conf, "renaming the GPO", strings.Join(cmds, " "), Domain()); err != nil {
+	if _, err := RunPSCommand(conf, "renaming the GPO", renameGPOCommand(g, target), Domain()); err != nil {
 		return err
 	}
 	return nil
 }
 
+// gpoStatusCommand renders the assignment of a status that has already been
+// through SanitiseString.
+func gpoStatusCommand(id, status string) string {
+	return fmt.Sprintf(`(%s).GpoStatus = %s`, getGPOCmdByGUID(id), psQuoteSanitised(status))
+}
+
 // ChangeStatus Changes the status of a GPO
 func (g *GPO) ChangeStatus(conf *config.ProviderConf, status string) error {
-	cmd := fmt.Sprintf(`(%s).GpoStatus = %s`, getGPOCmdByGUID(g.ID), psQuoteSanitised(status))
+	cmd := gpoStatusCommand(g.ID, status)
 
 	if _, err := RunPSCommand(conf, "changing the status of the GPO", cmd, Domain()); err != nil {
 		return err
@@ -186,9 +196,15 @@ func (g *GPO) NewGPO(conf *config.ProviderConf) (string, error) {
 	return gpo.ID, nil
 }
 
+// removeGPOCommand renders the Remove-GPO call for g, whose fields hold values
+// that SanitiseString has already escaped.
+func removeGPOCommand(g *GPO) string {
+	return fmt.Sprintf("Remove-GPO -Name %s -Domain %s", psQuoteSanitised(g.Name), psQuoteSanitised(g.Domain))
+}
+
 // DeleteGPO delete the GPO container
 func (g *GPO) DeleteGPO(conf *config.ProviderConf) error {
-	cmd := fmt.Sprintf("Remove-GPO -Name %s -Domain %s", psQuoteSanitised(g.Name), psQuoteSanitised(g.Domain))
+	cmd := removeGPOCommand(g)
 	_, err := RunPSCommand(conf, "removing the GPO", cmd, Domain())
 	return CheckDeleteResult(err, "GpoWithNameNotFound")
 }
@@ -314,7 +330,7 @@ func (g *GPO) SetGPOVersions(conf *config.ProviderConf, cpConn *winrmcp.Winrmcp,
 func (g *GPO) loadGPTIni(conf *config.ProviderConf) error {
 	gptPath := fmt.Sprintf("%s\\gpt.ini", g.basePath)
 	log.Printf("[DEBUG] Getting GPT ini from %s", gptPath)
-	cmd := fmt.Sprintf("Get-Content %s", psQuote(gptPath))
+	cmd := getContentCommand(gptPath)
 	result, err := RunPSCommand(conf, fmt.Sprintf("retrieving contents of %q", gptPath), cmd, Domain())
 	if err != nil {
 		return err
