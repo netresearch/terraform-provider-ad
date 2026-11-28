@@ -10,7 +10,7 @@ require (
 	github.com/masterzen/winrm v0.0.0-20261004123143-57b335310d59
 	github.com/packer-community/winrmcp v0.0.0-20221126162354-6e900dd2c68f
 	golang.org/x/text v0.43.0
-	gopkg.in/ini.v1 v1.67.3
+	gopkg.in/ini.v1 v1.68.0
 )
 
 require (
