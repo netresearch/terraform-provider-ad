@@ -5,7 +5,7 @@ go 1.27.0
 require (
 	github.com/go-viper/mapstructure/v2 v2.5.0
 	github.com/hashicorp/go-cty v1.5.0
-	github.com/hashicorp/terraform-plugin-sdk/v2 v2.40.1
+	github.com/hashicorp/terraform-plugin-sdk/v2 v2.41.1
 	github.com/jcmturner/gokrb5/v8 v8.4.4
 	github.com/masterzen/winrm v0.0.0-20261004123143-57b335310d59
 	github.com/packer-community/winrmcp v0.0.0-20221126162354-6e900dd2c68f
